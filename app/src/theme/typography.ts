@@ -18,4 +18,4 @@ export const typography = {
     medium: '500',
     bold: '700',
   },
-};
+} as const;

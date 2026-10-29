@@ -1,25 +1,22 @@
 export const colors = {
-  // Fond et surfaces (Cosy & Warm)
-  background: '#FDF6E3', // Crème doux, très apaisant
-  surface: '#FFFBF2',    // Blanc cassé pour les cartes
-  primary: '#B4A7D6',    // Lavande doux (Action principale)
-  secondary: '#FFB7B2',  // Rose pastel (Accent)
-  accent: '#D4E2D4',      // Vert menthe très pâle (Succès/Validation)
-
-  // Textes
-  textPrimary: '#5C5C5C', // Gris anthracite chaud (Pas de noir pur)
-  textSecondary: '#8C8C8C', // Gris moyen pour les sous-titres
-  textLight: '#BDBDBD',
-
-  // États
+  background: '#F7F4EC',
+  surface: '#FFFCF6',
+  primary: '#65795F',
+  secondary: '#E8BFA8',
+  accent: '#E6EDDF',
+  textPrimary: '#41473C',
+  textSecondary: '#858477',
+  textLight: '#B8B4A7',
+  sage: '#65795F',
+  sageLight: '#E8EDDF',
+  sagePale: '#EAF0E3',
+  peach: '#F0DDD0',
+  peachLight: '#F7E9DE',
+  clay: '#B97C61',
+  border: '#EEE9DE',
   error: '#E57373',
   success: '#81C784',
   warning: '#FFB74D',
-
-  // Palette Lofi Night (pour un futur mode sombre)
-  nightBackground: '#2D2D3A',
-  nightSurface: '#3B3B4F',
-  nightText: '#E0E0E0',
 };
 
 export const spacing = {

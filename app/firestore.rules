@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /habits/{habitId} {
+      allow read, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['title', 'icon', 'userId', 'createdAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0;
+
+      allow update: if false;
+
+      match /completions/{date} {
+        allow get: if request.auth != null
+          && get(/databases/$(database)/documents/habits/$(habitId)).data.userId == request.auth.uid;
+
+        allow list: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.habitId == habitId
+          && request.resource.data.date == date
+          && get(/databases/$(database)/documents/habits/$(habitId)).data.userId == request.auth.uid;
+
+        allow update: if false;
+
+        allow delete: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    match /exercises/{exerciseId} {
+      allow read, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'name', 'duration', 'intensity', 'equipment', 'note',
+          'selectedDate', 'completedDate', 'userId', 'createdAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.duration is int
+        && request.resource.data.duration > 0
+        && request.resource.data.duration <= 180;
+
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['selectedDate', 'completedDate'])
+        && (request.resource.data.selectedDate == null
+          || request.resource.data.selectedDate is string)
+        && (request.resource.data.completedDate == null
+          || request.resource.data.completedDate is string);
+    }
+
+    match /tasks/{taskId} {
+      allow read, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'title', 'description', 'priority', 'dueDate',
+          'completed', 'userId', 'createdAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.description is string
+        && request.resource.data.priority in ['urgent', 'important', 'normal']
+        && (request.resource.data.dueDate == null
+          || request.resource.data.dueDate is string)
+        && request.resource.data.completed is bool;
+
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['title', 'description', 'priority', 'dueDate', 'completed'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.description is string
+        && request.resource.data.priority in ['urgent', 'important', 'normal']
+        && (request.resource.data.dueDate == null
+          || request.resource.data.dueDate is string)
+        && request.resource.data.completed is bool;
+    }
+
+    match /{path=**}/completions/{date} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+  }
+}

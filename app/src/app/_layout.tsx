@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Slot, useRouter, useSegments } from 'expo-router';
-import { ThemeProvider, DefaultTheme, DarkTheme } from '@react-navigation/native';
-import { useColorScheme } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/src/services/firebase';
+import { auth } from '@/services/firebase';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
-  const [initialized, setInitialized] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [initialized, setInitialized] = useState(auth === null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    if (!auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+      setIsAuthenticated(user !== null);
       setInitialized(true);
     });
 
@@ -26,25 +25,18 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    if (!user && !inAuthGroup) {
-      // Rediriger vers la page de login si non connecté et hors du groupe auth
+    if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // Rediriger vers le dashboard si connecté et tente d'accéder au login
+    } else if (isAuthenticated && inAuthGroup) {
       router.replace('/');
     }
-  }, [user, segments, initialized]);
+  }, [isAuthenticated, segments, initialized, router]);
 
   if (!initialized) {
-    return null; // Ou un écran de chargement
+    return null;
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(main)" options={{ headerShown: false }} />
-      </Stack>
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }} />
   );
 }

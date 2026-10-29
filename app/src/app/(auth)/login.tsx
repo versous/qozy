@@ -1,22 +1,63 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { colors, spacing, borderRadius } from '@/src/theme/colors';
-import { typography } from '@/src/theme/typography';
-import { CosyButton } from '@/src/components/common/CosyButton';
-import { auth } from '@/src/services/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors, spacing, borderRadius } from '@/theme/colors';
+import { typography } from '@/theme/typography';
+import { CosyButton } from '@/components/common/CosyButton';
+import { auth, isFirebaseConfigured } from '@/services/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
 
 const AuthScreen = () => {
+  const [isRegistering, setIsRegistering] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [errorMessage, setErrorMessage] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
+    if (!auth || !isFirebaseConfigured) {
+      setErrorMessage('Configurez Firebase dans le fichier .env pour vous connecter.');
+      return;
+    }
+
+    setErrorMessage('');
+    if (isRegistering && password !== confirmPassword) {
+      setErrorMessage('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    if (isRegistering && password.length < 6) {
+      setErrorMessage('Le mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      }
       router.replace('/');
     } catch (error) {
-      alert('Erreur de connexion : ' + error.message);
+      if (error instanceof FirebaseError) {
+        const messages: Record<string, string> = {
+          'auth/email-already-in-use': 'Cette adresse e-mail possède déjà un compte.',
+          'auth/invalid-email': 'Saisissez une adresse e-mail valide.',
+          'auth/invalid-credential': 'E-mail ou mot de passe incorrect.',
+          'auth/weak-password': 'Choisissez un mot de passe plus sécurisé.',
+          'auth/operation-not-allowed': 'Activez e-mail/mot de passe dans Firebase Authentication.',
+          'auth/network-request-failed': 'Connexion réseau impossible. Réessayez.',
+        };
+        setErrorMessage(messages[error.code] ?? 'Une erreur est survenue. Réessayez.');
+      } else {
+        setErrorMessage('Une erreur est survenue. Réessayez.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -24,7 +65,9 @@ const AuthScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Bienvenue chez Qozy ✨</Text>
+          <Text style={styles.title}>
+            {isRegistering ? 'Créer votre compte Qozy ✨' : 'Bienvenue chez Qozy ✨'}
+          </Text>
           <Text style={styles.subtitle}>Votre espace de sérénité et de productivité</Text>
         </View>
 
@@ -38,6 +81,7 @@ const AuthScreen = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
             />
           </View>
 
@@ -49,22 +93,52 @@ const AuthScreen = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoComplete={isRegistering ? 'new-password' : 'current-password'}
             />
           </View>
 
+          {isRegistering ? (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirmer le mot de passe</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoComplete="new-password"
+              />
+            </View>
+          ) : null}
+
           <CosyButton
-            title="Se connecter"
-            onPress={handleLogin}
+            title={
+              isSubmitting
+                ? (isRegistering ? 'Création...' : 'Connexion...')
+                : (isRegistering ? 'Créer mon compte' : 'Se connecter')
+            }
+            onPress={handleSubmit}
+            disabled={isSubmitting}
             style={styles.loginButton}
           />
+          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          <Text
+            accessibilityRole="button"
+            onPress={() => {
+              setIsRegistering((current) => !current);
+              setErrorMessage('');
+            }}
+            style={styles.switchMode}
+          >
+            {isRegistering
+              ? 'Déjà un compte ? Se connecter'
+              : 'Pas encore de compte ? S’inscrire'}
+          </Text>
         </View>
       </View>
     </SafeAreaView>
   );
 };
-
-// Note: J'ajoute TextInput ici car il manquait dans l'import
-import { TextInput } from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
@@ -115,6 +189,18 @@ const styles = StyleSheet.create({
   loginButton: {
     marginTop: spacing.md,
     height: 55,
+  },
+  error: {
+    color: colors.error,
+    textAlign: 'center',
+    fontSize: typography.sizes.sm,
+  },
+  switchMode: {
+    color: colors.primary,
+    textAlign: 'center',
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    paddingVertical: spacing.sm,
   },
 });
 

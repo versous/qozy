@@ -6,6 +6,7 @@ interface CosyButtonProps {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'outline';
+  disabled?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -14,6 +15,7 @@ export const CosyButton: React.FC<CosyButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
+  disabled = false,
   style,
   textStyle
 }) => {
@@ -42,10 +44,12 @@ export const CosyButton: React.FC<CosyButtonProps> = ({
   return (
     <TouchableOpacity
       onPress={onPress}
+      disabled={disabled}
       activeOpacity={0.8}
       style={[
         styles.button,
         { backgroundColor: getBackgroundColor(), borderColor: getBorderColor() },
+        disabled && styles.disabled,
         style
       ]}
     >
@@ -74,5 +78,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  disabled: {
+    opacity: 0.55,
   },
 });

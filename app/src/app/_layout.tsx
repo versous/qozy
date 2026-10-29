@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Platform } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { auth } from '@/services/firebase';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 export default function RootLayout() {
   const segments = useSegments();
@@ -59,6 +60,8 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <ThemeProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ThemeProvider>
   );
 }

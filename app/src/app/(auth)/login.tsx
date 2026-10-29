@@ -10,7 +10,8 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, borderRadius } from '@/theme/colors';
+import { spacing, borderRadius, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
 import { CosyButton } from '@/components/common/CosyButton';
 import { auth, isFirebaseConfigured } from '@/services/firebase';
@@ -23,6 +24,8 @@ import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
 
 const AuthScreen = () => {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const [isRegistering, setIsRegistering] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -248,10 +251,10 @@ const AuthScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -267,7 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   brand: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 44,
     lineHeight: 52,
     fontFamily: 'serif',
@@ -277,13 +280,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     textAlign: 'center',
     fontFamily: 'serif',
   },
   subtitle: {
     fontSize: typography.sizes.md,
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -301,10 +304,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.sizes.sm,
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: palette.textPrimary,
   },
   visibilityToggle: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: typography.sizes.sm,
     fontWeight: '600',
   },
@@ -314,11 +317,11 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 54,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     padding: spacing.md,
     borderRadius: borderRadius.medium,
     fontSize: typography.sizes.md,
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
   },
@@ -327,12 +330,12 @@ const styles = StyleSheet.create({
     height: 55,
   },
   error: {
-    color: colors.error,
+    color: palette.error,
     textAlign: 'center',
     fontSize: typography.sizes.sm,
   },
   notice: {
-    color: colors.sage,
+    color: palette.sage,
     textAlign: 'center',
     fontSize: typography.sizes.sm,
     lineHeight: 20,
@@ -343,7 +346,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   switchModeText: {
-    color: colors.primary,
+    color: palette.primary,
     textAlign: 'center',
     fontSize: typography.sizes.sm,
     fontWeight: '600',

@@ -5,7 +5,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
-import { colors, spacing, borderRadius } from '@/theme/colors';
+import { spacing, borderRadius, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 const durations = [10, 25, 40];
 const activities = [
@@ -15,6 +16,8 @@ const activities = [
 ];
 
 export default function PrepareScreen() {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const { activity: initialActivity } = useLocalSearchParams<{ activity?: string }>();
   const [activity, setActivity] = useState(initialActivity ?? 'Lire');
   const [duration, setDuration] = useState(25);
@@ -149,49 +152,49 @@ export default function PrepareScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+const createStyles = (palette: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   backButton: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginBottom: spacing.sm },
-  backText: { color: colors.sage, fontSize: 13, fontWeight: '600' },
-  eyebrow: { color: colors.sage, fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 5 },
-  title: { color: colors.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600' },
-  subtitle: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: spacing.md },
-  segment: { flexDirection: 'row', backgroundColor: colors.sageLight, borderRadius: borderRadius.extraLarge, padding: 3, marginBottom: spacing.md },
-  segmentActive: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.sage, borderRadius: borderRadius.extraLarge, paddingVertical: 9 },
-  segmentActiveText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
+  backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
+  eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 5 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600' },
+  subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: spacing.md },
+  segment: { flexDirection: 'row', backgroundColor: palette.sageLight, borderRadius: borderRadius.extraLarge, padding: 3, marginBottom: spacing.md },
+  segmentActive: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sage, borderRadius: borderRadius.extraLarge, paddingVertical: 9 },
+  segmentActiveText: { color: palette.surface, fontSize: 11, fontWeight: '700' },
   segmentItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9 },
-  segmentText: { color: colors.textSecondary, fontSize: 10 },
-  featureCard: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.peach, borderRadius: borderRadius.medium, padding: spacing.sm, marginBottom: spacing.md },
-  featureArt: { width: 76, minHeight: 80, borderRadius: borderRadius.small, backgroundColor: colors.peachLight, alignItems: 'center', justifyContent: 'center' },
-  featureArtText: { color: colors.clay, fontSize: 30 },
+  segmentText: { color: palette.textSecondary, fontSize: 10 },
+  featureCard: { flexDirection: 'row', gap: spacing.sm, backgroundColor: palette.peach, borderRadius: borderRadius.medium, padding: spacing.sm, marginBottom: spacing.md },
+  featureArt: { width: 76, minHeight: 80, borderRadius: borderRadius.small, backgroundColor: palette.peachLight, alignItems: 'center', justifyContent: 'center' },
+  featureArtText: { color: palette.clay, fontSize: 30 },
   featureCopy: { flex: 1, justifyContent: 'center', paddingRight: spacing.xs },
-  featureTitle: { color: colors.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
-  featureDescription: { color: colors.textSecondary, fontSize: 10, lineHeight: 15, marginTop: 3 },
-  lofi: { color: colors.clay, fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
+  featureTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  featureDescription: { color: palette.textSecondary, fontSize: 10, lineHeight: 15, marginTop: 3 },
+  lofi: { color: palette.clay, fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  sectionTitle: { color: colors.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
-  muted: { color: colors.textSecondary, fontSize: 10 },
-  activityCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 74, padding: spacing.sm, backgroundColor: colors.surface, borderRadius: borderRadius.small, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.xs },
-  activityCardSelected: { borderColor: colors.sage, backgroundColor: '#F3F5EE' },
-  activityIcon: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.small, backgroundColor: colors.sagePale },
-  activityIconSelected: { backgroundColor: colors.sageLight },
-  activityIconText: { color: colors.sage, fontSize: 22 },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  muted: { color: palette.textSecondary, fontSize: 10 },
+  activityCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 74, padding: spacing.sm, backgroundColor: palette.surface, borderRadius: borderRadius.small, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  activityCardSelected: { borderColor: palette.sage, backgroundColor: palette.sagePale },
+  activityIcon: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.small, backgroundColor: palette.sagePale },
+  activityIconSelected: { backgroundColor: palette.sageLight },
+  activityIconText: { color: palette.sage, fontSize: 22 },
   activityCopy: { flex: 1 },
-  activityTitle: { color: colors.textPrimary, fontSize: 13, fontFamily: 'serif', fontWeight: '600' },
-  activityDescription: { color: colors.textSecondary, fontSize: 9, marginTop: 2 },
-  activityDuration: { color: colors.sage, fontSize: 9, fontWeight: '600', marginTop: 4 },
-  selectText: { color: colors.clay, fontSize: 9, fontWeight: '600', paddingHorizontal: spacing.xs },
-  durationCard: { backgroundColor: colors.sagePale, padding: spacing.sm, borderRadius: borderRadius.small, marginTop: spacing.sm },
+  activityTitle: { color: palette.textPrimary, fontSize: 13, fontFamily: 'serif', fontWeight: '600' },
+  activityDescription: { color: palette.textSecondary, fontSize: 9, marginTop: 2 },
+  activityDuration: { color: palette.sage, fontSize: 9, fontWeight: '600', marginTop: 4 },
+  selectText: { color: palette.clay, fontSize: 9, fontWeight: '600', paddingHorizontal: spacing.xs },
+  durationCard: { backgroundColor: palette.sagePale, padding: spacing.sm, borderRadius: borderRadius.small, marginTop: spacing.sm },
   durationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  durationCurrent: { color: colors.sage, fontSize: 10, fontWeight: '700', backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: borderRadius.extraLarge },
+  durationCurrent: { color: palette.sage, fontSize: 10, fontWeight: '700', backgroundColor: palette.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: borderRadius.extraLarge },
   durationOptions: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
-  durationOption: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: borderRadius.extraLarge, backgroundColor: colors.surface },
-  durationOptionSelected: { backgroundColor: colors.sage },
-  durationText: { color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
-  durationTextSelected: { color: colors.surface },
+  durationOption: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface },
+  durationOptionSelected: { backgroundColor: palette.sage },
+  durationText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600' },
+  durationTextSelected: { color: palette.surface },
   customDurationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
-  customDurationLabel: { color: colors.textSecondary, fontSize: 9 },
-  customDurationInput: { minWidth: 52, height: 34, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary, textAlign: 'center', fontSize: 11 },
-  startButton: { backgroundColor: colors.sage, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
+  customDurationLabel: { color: palette.textSecondary, fontSize: 9 },
+  customDurationInput: { minWidth: 52, height: 34, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, color: palette.textPrimary, textAlign: 'center', fontSize: 11 },
+  startButton: { backgroundColor: palette.sage, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
 });

@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { useTimer } from '@/hooks/useTimer';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function FocusScreen() {
   const { activity, minutes } = useLocalSearchParams<{ activity?: string; minutes?: string }>();
@@ -24,6 +25,8 @@ export default function FocusScreen() {
 }
 
 function FocusSession({ activity, duration }: { activity: string; duration: number }) {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const { secondsLeft, isActive, startTimer, pauseTimer, resetTimer, formatTime } = useTimer(
     duration,
     () => Alert.alert('Belle séance', 'Tu as pris ce temps pour toi. Bravo.')
@@ -82,24 +85,24 @@ function FocusSession({ activity, duration }: { activity: string; duration: numb
   );
 }
 
-const styles = StyleSheet.create({
-  background: { flex: 1, backgroundColor: colors.background },
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(39, 43, 35, 0.14)' },
+const createStyles = (palette: AppColors) => StyleSheet.create({
+  background: { flex: 1, backgroundColor: palette.background },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0, 0, 0, 0.28)' },
   safeArea: { flex: 1, justifyContent: 'space-between', padding: spacing.md },
-  backButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.extraLarge, backgroundColor: 'rgba(255,252,246,0.88)' },
-  backText: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  sessionCard: { alignSelf: 'flex-start', width: '100%', maxWidth: 300, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: 'rgba(255,252,246,0.96)' },
-  eyebrow: { color: colors.sage, fontSize: 8, letterSpacing: 0.9, fontWeight: '700' },
-  activity: { color: colors.textPrimary, fontSize: 17, fontFamily: 'serif', fontWeight: '600', marginTop: spacing.xs },
-  timer: { color: colors.textPrimary, fontSize: 34, fontWeight: '500', fontVariant: ['tabular-nums'], marginTop: spacing.xs },
-  total: { color: colors.textSecondary, fontSize: 9, marginTop: 1, marginBottom: spacing.sm },
-  progressTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden', marginBottom: spacing.sm },
-  progressFill: { height: '100%', borderRadius: 2, backgroundColor: colors.sage },
-  primaryButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: colors.sage },
-  primaryButtonText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
+  backButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface },
+  backText: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
+  sessionCard: { alignSelf: 'flex-start', width: '100%', maxWidth: 300, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface },
+  eyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 0.9, fontWeight: '700' },
+  activity: { color: palette.textPrimary, fontSize: 17, fontFamily: 'serif', fontWeight: '600', marginTop: spacing.xs },
+  timer: { color: palette.textPrimary, fontSize: 34, fontWeight: '500', fontVariant: ['tabular-nums'], marginTop: spacing.xs },
+  total: { color: palette.textSecondary, fontSize: 9, marginTop: 1, marginBottom: spacing.sm },
+  progressTrack: { height: 4, borderRadius: 2, backgroundColor: palette.border, overflow: 'hidden', marginBottom: spacing.sm },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: palette.sage },
+  primaryButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
+  primaryButtonText: { color: palette.surface, fontSize: 11, fontWeight: '700' },
   secondaryButton: { alignItems: 'center', paddingTop: spacing.sm },
-  secondaryButtonText: { color: colors.textSecondary, fontSize: 10, fontWeight: '600' },
-  footer: { color: colors.surface, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 5, marginBottom: spacing.sm },
+  secondaryButtonText: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
+  footer: { color: palette.surface, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 5, marginBottom: spacing.sm },
   pressed: { opacity: 0.82 },
   disabled: { opacity: 0.7 },
 });

@@ -1,4 +1,4 @@
-export const colors = {
+export const lightColors = {
   background: '#F7F4EC',
   surface: '#FFFCF6',
   primary: '#65795F',
@@ -18,6 +18,31 @@ export const colors = {
   success: '#81C784',
   warning: '#FFB74D',
 };
+
+export const darkColors = {
+  background: '#171A16',
+  surface: '#222720',
+  primary: '#A8BB9D',
+  secondary: '#B77F64',
+  accent: '#303A2F',
+  textPrimary: '#F0EEE6',
+  textSecondary: '#B4B5A9',
+  textLight: '#85897D',
+  sage: '#A8BB9D',
+  sageLight: '#344033',
+  sagePale: '#293229',
+  peach: '#3A2D27',
+  peachLight: '#342820',
+  clay: '#D49A7D',
+  border: '#363C33',
+  error: '#F08D8D',
+  success: '#91C99B',
+  warning: '#E8B66C',
+};
+
+export type AppColors = typeof lightColors;
+
+export const colors = lightColors;
 
 export const spacing = {
   xs: 4,

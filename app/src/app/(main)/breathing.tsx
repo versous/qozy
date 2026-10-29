@@ -6,11 +6,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useTimer } from '@/hooks/useTimer';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 const phases = ['Inspirez', 'Retenez', 'Expirez', 'Retenez'] as const;
 
 export default function BreathingScreen() {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const { activity: requestedActivity, minutes: requestedMinutes } =
     useLocalSearchParams<{ activity?: string; minutes?: string }>();
   const activity = requestedActivity ?? 'Revenir à soi';
@@ -111,43 +114,43 @@ export default function BreathingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+const createStyles = (palette: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   back: { alignSelf: 'flex-start', marginBottom: spacing.sm },
-  backText: { color: colors.sage, fontSize: 12, fontWeight: '600' },
+  backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.md },
-  brand: { color: colors.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
-  brandCaption: { color: colors.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
-  eyebrow: { color: colors.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
-  title: { color: colors.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
-  subtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
-  breathingCard: { height: 330, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.medium, backgroundColor: colors.sagePale },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
+  eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
+  breathingCard: { height: 330, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
   breathingImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
-  imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(248,246,236,0.22)' },
-  imageLabel: { position: 'absolute', top: spacing.md, color: colors.sage, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  breathCircle: { width: 178, height: 178, alignItems: 'center', justifyContent: 'center', borderRadius: 89, borderWidth: 1, borderColor: 'rgba(101,121,95,0.25)', backgroundColor: 'rgba(247,244,236,0.92)' },
-  breathCircleActive: { borderWidth: 7, borderColor: colors.sageLight },
-  phaseLabel: { color: colors.sage, fontSize: 13, fontWeight: '600' },
-  phaseSecond: { color: colors.sage, fontSize: 52, fontFamily: 'serif', lineHeight: 60 },
-  secondsLabel: { color: colors.textSecondary, fontSize: 9 },
-  breathHint: { position: 'absolute', bottom: 42, color: colors.textPrimary, fontSize: 8, textAlign: 'center' },
+  imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.16)' },
+  imageLabel: { position: 'absolute', top: spacing.md, color: palette.sage, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
+  breathCircle: { width: 178, height: 178, alignItems: 'center', justifyContent: 'center', borderRadius: 89, borderWidth: 1, borderColor: palette.sage, backgroundColor: palette.surface },
+  breathCircleActive: { borderWidth: 7, borderColor: palette.sageLight },
+  phaseLabel: { color: palette.sage, fontSize: 13, fontWeight: '600' },
+  phaseSecond: { color: palette.sage, fontSize: 52, fontFamily: 'serif', lineHeight: 60 },
+  secondsLabel: { color: palette.textSecondary, fontSize: 9 },
+  breathHint: { position: 'absolute', bottom: 42, color: palette.textPrimary, fontSize: 8, textAlign: 'center' },
   progressTrack: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 28, height: 3, borderRadius: 2, backgroundColor: 'rgba(101,121,95,0.2)' },
-  progressFill: { height: '100%', borderRadius: 2, backgroundColor: colors.sage },
-  cycleLabel: { position: 'absolute', bottom: 11, color: colors.sage, fontSize: 8, fontWeight: '600' },
-  encouragement: { color: colors.textSecondary, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: palette.sage },
+  cycleLabel: { position: 'absolute', bottom: 11, color: palette.sage, fontSize: 8, fontWeight: '600' },
+  encouragement: { color: palette.textSecondary, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: colors.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
-  seeAll: { color: colors.sage, fontSize: 10, fontWeight: '600' },
-  audioCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.small, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.xs },
-  audioIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.sagePale },
-  audioIconText: { color: colors.sage, fontSize: 19 },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  seeAll: { color: palette.sage, fontSize: 10, fontWeight: '600' },
+  audioCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  audioIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: palette.sagePale },
+  audioIconText: { color: palette.sage, fontSize: 19 },
   audioCopy: { flex: 1 },
-  audioTitle: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  audioSubtitle: { color: colors.textSecondary, fontSize: 9, marginTop: 3 },
-  playIcon: { color: colors.sage, fontSize: 17, paddingHorizontal: spacing.xs },
+  audioTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
+  audioSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
+  playIcon: { color: palette.sage, fontSize: 17, paddingHorizontal: spacing.xs },
   controls: { alignItems: 'stretch', marginTop: spacing.sm },
-  primaryButton: { backgroundColor: colors.sage, borderWidth: 0 },
+  primaryButton: { backgroundColor: palette.sage, borderWidth: 0 },
   resetButton: { alignItems: 'center', padding: spacing.sm },
-  resetText: { color: colors.textSecondary, fontSize: 10 },
+  resetText: { color: palette.textSecondary, fontSize: 10 },
 });

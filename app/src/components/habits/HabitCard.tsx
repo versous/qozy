@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, spacing, borderRadius } from '../../theme/colors';
+import { spacing, borderRadius, type AppColors } from '../../theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '../../theme/typography';
 
 interface HabitCardProps {
@@ -18,6 +19,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   onToggle,
   icon = '🌱'
 }) => {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
+
   return (
     <TouchableOpacity
       onPress={onToggle}
@@ -47,7 +51,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -82,24 +86,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.medium,
-    color: colors.textPrimary,
+    color: palette.textPrimary,
   },
   streakText: {
     fontSize: typography.sizes.xs,
-    color: colors.textSecondary,
+    color: palette.textSecondary,
   },
   checkbox: {
     width: 28,
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
+    backgroundColor: palette.primary,
   },
   checkMark: {
     color: '#FFF',

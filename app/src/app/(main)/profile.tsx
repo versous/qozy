@@ -8,10 +8,14 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useHabits } from '@/hooks/useHabits';
 import { auth } from '@/services/firebase';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
 
 export default function ProfileScreen() {
+  const { colors, mode, toggleMode } = useAppTheme();
+  const isDark = mode === 'dark';
+  const styles = createStyles(colors);
   const { habits, loading, error } = useHabits();
   const [signOutError, setSignOutError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -85,6 +89,30 @@ export default function ProfileScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.sectionHeading}>
+          <Text style={styles.sectionTitle}>Apparence</Text>
+        </View>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: isDark }}
+          onPress={toggleMode}
+          style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
+          <View style={[styles.menuIcon, styles.menuIconSage]}>
+            <Text style={styles.menuIconText}>{isDark ? '☾' : '☼'}</Text>
+          </View>
+          <View style={styles.menuCopy}>
+            <Text style={styles.menuTitle}>Mode sombre</Text>
+            <Text style={styles.menuSubtitle}>
+              {isDark ? 'Activé · appuie pour revenir au mode clair' : 'Désactivé · appuie pour l’activer'}
+            </Text>
+          </View>
+          <View style={[styles.planBadge, isDark && styles.themeBadgeActive]}>
+            <Text style={[styles.planBadgeText, isDark && styles.themeBadgeTextActive]}>
+              {isDark ? 'ACTIVÉ' : 'DÉSACTIVÉ'}
+            </Text>
+          </View>
+        </Pressable>
+
+        <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Mon espace Qozy</Text>
         </View>
         <View style={styles.planCard}>
@@ -138,50 +166,52 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+const createStyles = (palette: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.lg },
-  brand: { color: colors.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
-  brandCaption: { color: colors.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
-  eyebrow: { color: colors.sage, fontSize: 9, letterSpacing: 0.8, fontWeight: '700' },
-  title: { color: colors.textPrimary, fontSize: 25, lineHeight: 32, fontFamily: 'serif', fontWeight: '600', marginTop: 5, marginBottom: spacing.md },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.peach },
-  avatarText: { color: colors.clay, fontSize: 18, fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
+  eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 0.8, fontWeight: '700' },
+  title: { color: palette.textPrimary, fontSize: 25, lineHeight: 32, fontFamily: 'serif', fontWeight: '600', marginTop: 5, marginBottom: spacing.md },
+  profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.peach },
+  avatarText: { color: palette.clay, fontSize: 18, fontWeight: '700' },
   profileCopy: { flex: 1 },
-  name: { color: colors.textPrimary, fontSize: typography.sizes.md, fontWeight: '700' },
-  email: { color: colors.textSecondary, fontSize: 11, marginTop: 4 },
-  sparkle: { color: colors.sage, fontSize: 18 },
+  name: { color: palette.textPrimary, fontSize: typography.sizes.md, fontWeight: '700' },
+  email: { color: palette.textSecondary, fontSize: 11, marginTop: 4 },
+  sparkle: { color: palette.sage, fontSize: 18 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: colors.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
-  sectionMeta: { color: colors.textSecondary, fontSize: 9 },
-  statsCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.medium, backgroundColor: colors.sagePale },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionMeta: { color: palette.textSecondary, fontSize: 9 },
+  statsCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
   stat: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 5 },
-  statValue: { color: colors.sage, fontSize: 23, fontFamily: 'serif', fontWeight: '700' },
-  statLabel: { color: colors.textSecondary, fontSize: 9 },
-  statDivider: { width: 1, height: 38, backgroundColor: colors.border },
-  error: { color: colors.error, fontSize: 11, marginTop: spacing.sm },
-  planCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  statValue: { color: palette.sage, fontSize: 23, fontFamily: 'serif', fontWeight: '700' },
+  statLabel: { color: palette.textSecondary, fontSize: 9 },
+  statDivider: { width: 1, height: 38, backgroundColor: palette.border },
+  error: { color: palette.error, fontSize: 11, marginTop: spacing.sm },
+  planCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   planTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  planIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: colors.peachLight },
-  planIconText: { color: colors.clay, fontSize: 20 },
+  planIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.peachLight },
+  planIconText: { color: palette.clay, fontSize: 20 },
   planCopy: { flex: 1 },
-  planTitle: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
-  planSubtitle: { color: colors.textSecondary, fontSize: 9, marginTop: 3 },
-  planBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: borderRadius.extraLarge, backgroundColor: colors.sagePale },
-  planBadgeText: { color: colors.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.4 },
-  planRule: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
-  planNote: { color: colors.textSecondary, fontSize: 10, lineHeight: 16 },
-  menuRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  planTitle: { color: palette.textPrimary, fontSize: 12, fontWeight: '700' },
+  planSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
+  planBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  planBadgeText: { color: palette.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.4 },
+  themeBadgeActive: { backgroundColor: palette.sage },
+  themeBadgeTextActive: { color: palette.surface },
+  planRule: { height: 1, backgroundColor: palette.border, marginVertical: spacing.sm },
+  planNote: { color: palette.textSecondary, fontSize: 10, lineHeight: 16 },
+  menuRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   menuIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  menuIconSage: { backgroundColor: colors.sagePale },
-  menuIconText: { color: colors.sage, fontSize: 18 },
+  menuIconSage: { backgroundColor: palette.sagePale },
+  menuIconText: { color: palette.sage, fontSize: 18 },
   menuCopy: { flex: 1 },
-  menuTitle: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  menuSubtitle: { color: colors.textSecondary, fontSize: 9, marginTop: 3 },
-  menuArrow: { color: colors.sage, fontSize: 22 },
-  signOutButton: { marginTop: spacing.lg, borderColor: colors.border, backgroundColor: colors.surface },
-  footer: { color: colors.textSecondary, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
+  menuTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
+  menuSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
+  menuArrow: { color: palette.sage, fontSize: 22 },
+  signOutButton: { marginTop: spacing.lg, borderColor: palette.border, backgroundColor: palette.surface },
+  footer: { color: palette.textSecondary, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
   pressed: { opacity: 0.78 },
 });

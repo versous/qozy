@@ -19,13 +19,14 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type HabitDay, useHabits } from '@/hooks/useHabits';
 import { auth } from '@/services/firebase';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
 
 const activities = [
-  { title: 'Exercice', detail: 'Faire du sport avec toi', duration: '15 min', icon: '✳', tint: colors.peach },
-  { title: 'Focus', detail: 'Lire un livre avec toi', duration: '25 min', icon: '▤', tint: colors.sageLight },
-  { title: 'Méditation', detail: 'Méditer avec toi', duration: '10 min', icon: '◉', tint: colors.sagePale },
+  { title: 'Exercice', detail: 'Faire du sport avec toi', duration: '15 min', icon: '✳', tint: 'peach' as const },
+  { title: 'Focus', detail: 'Lire un livre avec toi', duration: '25 min', icon: '▤', tint: 'sageLight' as const },
+  { title: 'Méditation', detail: 'Méditer avec toi', duration: '10 min', icon: '◉', tint: 'sagePale' as const },
 ];
 
 const todayLabel = new Date().toLocaleDateString('fr-FR', {
@@ -35,6 +36,8 @@ const todayLabel = new Date().toLocaleDateString('fr-FR', {
 });
 
 export default function Dashboard() {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const { habits, loading, error, addHabit, toggleHabit } = useHabits();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState('');
@@ -137,7 +140,7 @@ export default function Dashboard() {
               accessibilityRole="button"
               onPress={() => openActivity(activity.title)}
               style={({ pressed }) => [styles.activityCard, pressed && styles.pressed]}>
-              <View style={[styles.activityImageWrap, { backgroundColor: activity.tint }]}>
+              <View style={[styles.activityImageWrap, { backgroundColor: colors[activity.tint] }]}>
                 <Image
                   source={require('@/assets/images/home-hero.jpg')}
                   contentFit="cover"
@@ -258,10 +261,10 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
@@ -283,14 +286,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   brandMark: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 28,
     fontFamily: 'serif',
     fontWeight: '700',
     letterSpacing: -1,
   },
   brandCaption: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 8,
     fontWeight: '600',
     letterSpacing: 1.1,
@@ -301,15 +304,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: colors.peach,
+    backgroundColor: palette.peach,
   },
   avatarText: {
-    color: colors.clay,
+    color: palette.clay,
     fontSize: 12,
     fontWeight: '700',
   },
   dateLabel: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.6,
@@ -317,7 +320,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   pageTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 25,
     lineHeight: 32,
     fontFamily: 'serif',
@@ -328,7 +331,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.large,
     aspectRatio: 1.78,
     marginBottom: spacing.md,
-    backgroundColor: colors.peach,
+    backgroundColor: palette.peach,
   },
   heroImage: {
     width: '100%',
@@ -341,18 +344,18 @@ const styles = StyleSheet.create({
   },
   heroPill: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: borderRadius.extraLarge,
   },
   heroPillText: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 11,
     fontWeight: '600',
   },
   focusCard: {
-    backgroundColor: colors.sagePale,
+    backgroundColor: palette.sagePale,
     borderRadius: borderRadius.medium,
     padding: spacing.md,
     marginBottom: spacing.lg,
@@ -366,10 +369,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
   },
   focusIconText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 20,
   },
   focusCopy: {
@@ -377,20 +380,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   eyebrow: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 8,
     fontWeight: '700',
     letterSpacing: 0.75,
     marginBottom: 4,
   },
   focusTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 15,
     fontFamily: 'serif',
     fontWeight: '600',
   },
   focusAction: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
     minHeight: 42,
     borderRadius: borderRadius.extraLarge,
     flexDirection: 'row',
@@ -399,12 +402,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   focusActionText: {
-    color: colors.surface,
+    color: palette.surface,
     fontSize: 12,
     fontWeight: '600',
   },
   actionArrow: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 22,
     lineHeight: 24,
   },
@@ -416,18 +419,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 18,
     fontFamily: 'serif',
     fontWeight: '600',
   },
   sectionSubtitle: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 11,
     marginTop: 3,
   },
   sectionAccent: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 10,
     fontWeight: '600',
   },
@@ -441,9 +444,9 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     minHeight: 90,
     borderRadius: borderRadius.medium,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   activityImageWrap: {
     width: 66,
@@ -462,7 +465,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 252, 246, 0.36)',
   },
   activityIconText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 24,
     fontWeight: '600',
   },
@@ -472,17 +475,17 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   activityTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 14,
     fontFamily: 'serif',
     fontWeight: '600',
   },
   activityDetail: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
   },
   activityDuration: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 10,
     fontWeight: '600',
     marginTop: 3,
@@ -491,20 +494,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: borderRadius.extraLarge,
-    backgroundColor: colors.peachLight,
+    backgroundColor: palette.peachLight,
   },
   activityActionText: {
-    color: colors.clay,
+    color: palette.clay,
     fontSize: 9,
     fontWeight: '600',
   },
   seeAll: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 11,
     fontWeight: '600',
   },
   errorText: {
-    color: colors.error,
+    color: palette.error,
     fontSize: typography.sizes.sm,
     marginBottom: spacing.sm,
   },
@@ -516,11 +519,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   habitList: {
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderRadius: borderRadius.medium,
     paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   habitRow: {
     minHeight: 52,
@@ -528,36 +531,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: palette.border,
   },
   habitCheck: {
     width: 20,
     height: 20,
     borderWidth: 1,
-    borderColor: colors.sage,
+    borderColor: palette.sage,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   habitCheckDone: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
   },
   checkmark: {
-    color: colors.surface,
+    color: palette.surface,
     fontSize: 12,
     fontWeight: '700',
   },
   habitTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 12,
     flex: 1,
   },
   habitTitleDone: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     textDecorationLine: 'line-through',
   },
   habitStreak: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 10,
   },
   emptyCard: {
@@ -567,9 +570,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.sm,
     borderRadius: borderRadius.medium,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   emptyIcon: {
     width: 38,
@@ -577,27 +580,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 19,
-    backgroundColor: colors.sagePale,
+    backgroundColor: palette.sagePale,
   },
   emptyIconText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 22,
   },
   emptyCopy: {
     flex: 1,
   },
   emptyTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
     marginTop: 2,
   },
   reassurance: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 11,
     fontFamily: 'serif',
     fontStyle: 'italic',
@@ -615,25 +618,25 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     borderTopLeftRadius: borderRadius.large,
     borderTopRightRadius: borderRadius.large,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background,
   },
   modalHandle: {
     width: 38,
     height: 4,
     alignSelf: 'center',
     borderRadius: 2,
-    backgroundColor: colors.border,
+    backgroundColor: palette.border,
     marginBottom: spacing.md,
   },
   modalEyebrow: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1,
     textAlign: 'center',
   },
   modalTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 23,
     fontFamily: 'serif',
     fontWeight: '600',
@@ -646,13 +649,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.small,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
+    backgroundColor: palette.surface,
+    color: palette.textPrimary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   modalButton: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
     borderRadius: borderRadius.extraLarge,
     borderWidth: 0,
     marginTop: spacing.xs,
@@ -662,7 +665,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   cancelText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },

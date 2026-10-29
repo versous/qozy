@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, spacing, borderRadius } from '../../theme/colors';
+import { spacing, borderRadius, type AppColors } from '../../theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 interface CosyButtonProps {
   title: string;
@@ -19,6 +20,8 @@ export const CosyButton: React.FC<CosyButtonProps> = ({
   style,
   textStyle
 }) => {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
 
   const getBackgroundColor = () => {
     switch (variant) {
@@ -60,7 +63,7 @@ export const CosyButton: React.FC<CosyButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   button: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,

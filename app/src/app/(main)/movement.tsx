@@ -6,9 +6,12 @@ import { router } from 'expo-router';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { Exercise, useExercises } from '@/hooks/useExercises';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function MovementScreen() {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const { exercises, today, loading, error, toggleCompleted } = useExercises();
   const todaysExercises = exercises.filter((exercise) => exercise.selectedDate === today);
   const completed = todaysExercises.filter((exercise) => exercise.completedDate === today).length;
@@ -139,17 +142,17 @@ export default function MovementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+const createStyles = (palette: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   back: { alignSelf: 'flex-start', marginBottom: spacing.sm },
-  backText: { color: colors.sage, fontSize: 12, fontWeight: '600' },
+  backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.md },
-  brand: { color: colors.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
-  brandCaption: { color: colors.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
-  eyebrow: { color: colors.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
-  title: { color: colors.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
-  subtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
+  eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
   hero: { height: 138, overflow: 'hidden', borderRadius: borderRadius.medium, marginBottom: spacing.sm, justifyContent: 'center' },
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(40,43,34,0.18)' },
@@ -157,33 +160,33 @@ const styles = StyleSheet.create({
   heroTitle: { color: '#FFFDF7', fontSize: 17, fontFamily: 'serif', fontWeight: '700' },
   heroSubtitle: { color: '#FFFDF7', fontSize: 10, lineHeight: 15, marginTop: 4 },
   lofi: { color: '#FFFDF7', fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
-  progressCard: { padding: spacing.sm, backgroundColor: colors.sagePale, borderRadius: borderRadius.small, marginBottom: spacing.md },
+  progressCard: { padding: spacing.sm, backgroundColor: palette.sagePale, borderRadius: borderRadius.small, marginBottom: spacing.md },
   progressHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progressTitle: { color: colors.sage, fontSize: 11, fontWeight: '700' },
-  progressDate: { color: colors.textSecondary, fontSize: 8 },
-  progressTrack: { height: 6, overflow: 'hidden', borderRadius: 3, backgroundColor: colors.surface, marginTop: spacing.sm },
-  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.sage },
-  progressCount: { color: colors.textSecondary, fontSize: 8, textAlign: 'right', marginTop: 4 },
+  progressTitle: { color: palette.sage, fontSize: 11, fontWeight: '700' },
+  progressDate: { color: palette.textSecondary, fontSize: 8 },
+  progressTrack: { height: 6, overflow: 'hidden', borderRadius: 3, backgroundColor: palette.surface, marginTop: spacing.sm },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: palette.sage },
+  progressCount: { color: palette.textSecondary, fontSize: 8, textAlign: 'right', marginTop: 4 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: colors.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
-  sectionCount: { color: colors.textSecondary, fontSize: 9 },
-  error: { color: colors.error, fontSize: 10, marginBottom: spacing.sm },
-  exerciseCard: { minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.xs },
-  checkbox: { width: 21, height: 21, borderRadius: 7, borderWidth: 1, borderColor: colors.sage, alignItems: 'center', justifyContent: 'center' },
-  checkboxDone: { backgroundColor: colors.sage },
-  checkmark: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  sectionCount: { color: palette.textSecondary, fontSize: 9 },
+  error: { color: palette.error, fontSize: 10, marginBottom: spacing.sm },
+  exerciseCard: { minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  checkbox: { width: 21, height: 21, borderRadius: 7, borderWidth: 1, borderColor: palette.sage, alignItems: 'center', justifyContent: 'center' },
+  checkboxDone: { backgroundColor: palette.sage },
+  checkmark: { color: palette.surface, fontSize: 13, fontWeight: '700' },
   exerciseCopy: { flex: 1 },
-  exerciseName: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  exerciseNameDone: { color: colors.textSecondary, textDecorationLine: 'line-through' },
-  exerciseMeta: { color: colors.textSecondary, fontSize: 8, marginTop: 3 },
-  arrow: { color: colors.sage, fontSize: 21 },
-  emptyCard: { padding: spacing.md, borderRadius: borderRadius.small, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  emptyTitle: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  emptyText: { color: colors.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4 },
-  primaryButton: { backgroundColor: colors.sage, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
+  exerciseName: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
+  exerciseNameDone: { color: palette.textSecondary, textDecorationLine: 'line-through' },
+  exerciseMeta: { color: palette.textSecondary, fontSize: 8, marginTop: 3 },
+  arrow: { color: palette.sage, fontSize: 21 },
+  emptyCard: { padding: spacing.md, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  emptyTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
+  emptyText: { color: palette.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4 },
+  primaryButton: { backgroundColor: palette.sage, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  secondaryButton: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: borderRadius.small, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  secondaryIcon: { color: colors.sage, fontSize: 15 },
-  secondaryText: { color: colors.sage, fontSize: 9, fontWeight: '600' },
-  congrats: { color: colors.sage, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
+  secondaryButton: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  secondaryIcon: { color: palette.sage, fontSize: 15 },
+  secondaryText: { color: palette.sage, fontSize: 9, fontWeight: '600' },
+  congrats: { color: palette.sage, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
 });

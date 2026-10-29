@@ -18,7 +18,8 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useHabits } from '@/hooks/useHabits';
 import { useTasks, type TaskPriority, type TodoTask } from '@/hooks/useTasks';
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 const weekdayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const priorities: { value: TaskPriority; label: string }[] = [
@@ -66,6 +67,8 @@ function isValidDate(value: string) {
 }
 
 export default function CalendarScreen() {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const todayKey = getDateKey(new Date());
   const { allHabits, loading: habitsLoading, error: habitsError, toggleHabitForDate } = useHabits();
   const { tasks, loading: tasksLoading, error: tasksError, toggleTask, saveTask } = useTasks();
@@ -451,10 +454,10 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background,
   },
   content: {
     paddingHorizontal: spacing.md,
@@ -467,40 +470,40 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   brand: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 24,
     fontFamily: 'serif',
     fontWeight: '700',
   },
   brandCaption: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 8,
     fontWeight: '700',
     letterSpacing: 1.4,
   },
   eyebrow: {
-    color: colors.clay,
+    color: palette.clay,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
   title: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontFamily: 'serif',
     fontSize: 30,
     fontWeight: '600',
     marginTop: spacing.xs,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 12,
     lineHeight: 18,
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
   },
   calendarCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
     borderRadius: borderRadius.large,
     borderWidth: 1,
     padding: spacing.md,
@@ -519,12 +522,12 @@ const styles = StyleSheet.create({
     width: 36,
   },
   monthArrowText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 28,
     lineHeight: 32,
   },
   monthTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontFamily: 'serif',
     fontSize: 18,
     fontWeight: '600',
@@ -534,7 +537,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   weekdayLabel: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     flex: 1,
     fontSize: 10,
     fontWeight: '700',
@@ -552,18 +555,18 @@ const styles = StyleSheet.create({
     width: `${100 / 7}%`,
   },
   dayCellSelected: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
   },
   dayNumber: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 12,
   },
   dayNumberToday: {
-    color: colors.clay,
+    color: palette.clay,
     fontWeight: '700',
   },
   dayNumberSelected: {
-    color: colors.surface,
+    color: palette.surface,
     fontWeight: '700',
   },
   dayIndicators: {
@@ -579,14 +582,14 @@ const styles = StyleSheet.create({
     width: 5,
   },
   taskIndicator: {
-    backgroundColor: colors.clay,
+    backgroundColor: palette.clay,
   },
   habitIndicator: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
   },
   legend: {
     alignItems: 'center',
-    borderTopColor: colors.border,
+    borderTopColor: palette.border,
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: spacing.md,
@@ -599,11 +602,11 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   legendText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
   },
   todayLink: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 10,
     fontWeight: '700',
     marginLeft: 'auto',
@@ -616,29 +619,29 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontFamily: 'serif',
     fontSize: 21,
     fontWeight: '600',
   },
   sectionSubtitle: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
     marginTop: 2,
   },
   addTaskButton: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
     borderRadius: borderRadius.extraLarge,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   addTaskButtonText: {
-    color: colors.surface,
+    color: palette.surface,
     fontSize: 10,
     fontWeight: '700',
   },
   errorText: {
-    color: colors.error,
+    color: palette.error,
     fontSize: 11,
     marginBottom: spacing.sm,
   },
@@ -647,8 +650,8 @@ const styles = StyleSheet.create({
   },
   dayItem: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
     borderRadius: borderRadius.medium,
     borderWidth: 1,
     flexDirection: 'row',
@@ -662,7 +665,7 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     alignItems: 'center',
-    borderColor: colors.sage,
+    borderColor: palette.sage,
     borderRadius: 6,
     borderWidth: 1,
     height: 20,
@@ -673,10 +676,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   checkboxDone: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
   },
   checkmark: {
-    color: colors.surface,
+    color: palette.surface,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -684,53 +687,53 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
   itemTitleDone: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     textDecorationLine: 'line-through',
   },
   itemMeta: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
     marginTop: 3,
   },
   itemType: {
-    color: colors.textLight,
+    color: palette.textLight,
     fontSize: 8,
     fontWeight: '700',
     letterSpacing: 0.6,
   },
   emptyCard: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
     borderRadius: borderRadius.medium,
     borderWidth: 1,
     marginTop: spacing.xs,
     padding: spacing.lg,
   },
   emptyIcon: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 22,
   },
   emptyTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: '600',
     marginTop: spacing.xs,
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
   premiumCard: {
-    backgroundColor: colors.sagePale,
-    borderColor: colors.sageLight,
+    backgroundColor: palette.sagePale,
+    borderColor: palette.sageLight,
     borderRadius: borderRadius.large,
     borderWidth: 1,
     marginTop: spacing.lg,
@@ -743,43 +746,43 @@ const styles = StyleSheet.create({
   },
   premiumIcon: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderRadius: 19,
     height: 38,
     justifyContent: 'center',
     width: 38,
   },
   premiumIconText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 18,
   },
   premiumCopy: {
     flex: 1,
   },
   premiumTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
   premiumSubtitle: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
     marginTop: 2,
   },
   premiumBadge: {
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderRadius: borderRadius.extraLarge,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
   },
   premiumBadgeText: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 8,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   premiumDivider: {
-    backgroundColor: colors.border,
+    backgroundColor: palette.border,
     height: 1,
     marginVertical: spacing.md,
   },
@@ -789,7 +792,7 @@ const styles = StyleSheet.create({
   },
   premiumFeature: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderRadius: borderRadius.medium,
     flex: 1,
     gap: spacing.xs,
@@ -798,17 +801,17 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   premiumFeatureIcon: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 17,
   },
   premiumFeatureText: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 9,
     fontWeight: '600',
     textAlign: 'center',
   },
   premiumNote: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
     lineHeight: 14,
     marginTop: spacing.sm,
@@ -825,7 +828,7 @@ const styles = StyleSheet.create({
   modal: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background,
     borderTopLeftRadius: borderRadius.large,
     borderTopRightRadius: borderRadius.large,
   },
@@ -834,18 +837,18 @@ const styles = StyleSheet.create({
     height: 4,
     alignSelf: 'center',
     borderRadius: 2,
-    backgroundColor: colors.border,
+    backgroundColor: palette.border,
     marginBottom: spacing.md,
   },
   modalEyebrow: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1,
     textAlign: 'center',
   },
   modalTitle: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 22,
     fontFamily: 'serif',
     fontWeight: '600',
@@ -854,12 +857,12 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 50,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderRadius: borderRadius.small,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
     paddingHorizontal: spacing.md,
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     marginBottom: spacing.sm,
   },
   descriptionInput: {
@@ -868,7 +871,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   formLabel: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: spacing.xs,
@@ -883,24 +886,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.extraLarge,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   priorityOptionSelected: {
-    backgroundColor: colors.sage,
-    borderColor: colors.sage,
+    backgroundColor: palette.sage,
+    borderColor: palette.sage,
   },
   priorityOptionText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
     fontWeight: '600',
   },
   priorityOptionTextSelected: {
-    color: colors.surface,
+    color: palette.surface,
   },
   modalAction: {
-    backgroundColor: colors.sage,
+    backgroundColor: palette.sage,
     borderWidth: 0,
     borderRadius: borderRadius.extraLarge,
     marginTop: spacing.xs,
@@ -910,7 +913,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   cancelButtonText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },

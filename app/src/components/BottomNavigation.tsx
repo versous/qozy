@@ -1,7 +1,8 @@
 import { router, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing } from '@/theme/colors';
+import { spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 type Tab = 'today' | 'calendar' | 'tasks' | 'account';
 
@@ -13,6 +14,8 @@ const tabs: { key: Tab; label: string; icon: string; route: Href }[] = [
 ];
 
 export function BottomNavigation({ active }: { active: Tab }) {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   return (
     <View style={styles.container}>
       {tabs.map((tab) => {
@@ -33,16 +36,16 @@ export function BottomNavigation({ active }: { active: Tab }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: palette.border,
   },
   item: {
     flex: 1,
@@ -51,19 +54,19 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   icon: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 19,
   },
   iconSelected: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 20,
   },
   label: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
   },
   labelSelected: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 9,
     fontWeight: '700',
   },

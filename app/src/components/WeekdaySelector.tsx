@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { borderRadius, colors, spacing } from '@/theme/colors';
+import { borderRadius, spacing, type AppColors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import { type HabitDay } from '@/hooks/useHabits';
 
 const days: { value: HabitDay; label: string; accessibilityLabel: string }[] = [
@@ -22,6 +23,8 @@ export function WeekdaySelector({
   onChange: (days: HabitDay[]) => void;
   disabled?: boolean;
 }) {
+  const colors = useAppTheme().colors;
+  const styles = createStyles(colors);
   const allSelected = selectedDays.length === days.length;
 
   const toggleDay = (day: HabitDay) => {
@@ -77,7 +80,7 @@ export function WeekdaySelector({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppColors) => StyleSheet.create({
   container: {
     gap: spacing.xs,
     marginBottom: spacing.sm,
@@ -88,12 +91,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   label: {
-    color: colors.textPrimary,
+    color: palette.textPrimary,
     fontSize: 11,
     fontWeight: '600',
   },
   everyday: {
-    color: colors.sage,
+    color: palette.sage,
     fontSize: 10,
     fontWeight: '600',
   },
@@ -108,27 +111,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: borderRadius.extraLarge,
-    backgroundColor: colors.surface,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.border,
   },
   daySelected: {
-    backgroundColor: colors.sage,
-    borderColor: colors.sage,
+    backgroundColor: palette.sage,
+    borderColor: palette.sage,
   },
   dayDisabled: {
     opacity: 0.6,
   },
   dayText: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 10,
     fontWeight: '600',
   },
   dayTextSelected: {
-    color: colors.surface,
+    color: palette.surface,
   },
   hint: {
-    color: colors.textSecondary,
+    color: palette.textSecondary,
     fontSize: 9,
   },
 });

@@ -16,8 +16,10 @@ import { router } from 'expo-router';
 
 import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
+import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
-import { ALL_HABIT_DAYS, type HabitDay, useHabits } from '@/hooks/useHabits';
+import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { auth } from '@/services/firebase';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -38,10 +40,13 @@ const todayLabel = new Date().toLocaleDateString('fr-FR', {
 export default function Dashboard() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const { habits, loading, error, addHabit, toggleHabit } = useHabits();
+  const { habits, loading, error, addHabit, toggleHabit, updateHabitProgress } = useHabits();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitDays, setNewHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
+  const [newHabitGoalType, setNewHabitGoalType] = useState<HabitGoalType>('check');
+  const [newHabitGoalTarget, setNewHabitGoalTarget] = useState('20');
+  const [newHabitGoalUnit, setNewHabitGoalUnit] = useState('pages');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const firstName = auth?.currentUser?.displayName?.split(' ')[0] || 'toi';
@@ -50,9 +55,16 @@ export default function Dashboard() {
     setIsSaving(true);
     setSaveError('');
     try {
-      await addHabit(newHabitTitle, '🌱', newHabitDays);
+      await addHabit(newHabitTitle, '🌱', newHabitDays, {
+        type: newHabitGoalType,
+        target: newHabitGoalType === 'check' ? 1 : Number(newHabitGoalTarget),
+        unit: newHabitGoalUnit,
+      });
       setNewHabitTitle('');
       setNewHabitDays(ALL_HABIT_DAYS);
+      setNewHabitGoalType('check');
+      setNewHabitGoalTarget('20');
+      setNewHabitGoalUnit('pages');
       setIsModalVisible(false);
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter l'habitude.");
@@ -180,7 +192,7 @@ export default function Dashboard() {
           </View>
         ) : habits.length ? (
           <View style={styles.habitList}>
-            {habits.slice(0, 3).map((habit) => (
+            {habits.slice(0, 3).map((habit) => habit.goalType === 'check' ? (
               <Pressable
                 key={habit.id}
                 accessibilityRole="checkbox"
@@ -200,8 +212,25 @@ export default function Dashboard() {
                 <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
                   {habit.title}
                 </Text>
-                <Text style={styles.habitStreak}>{habit.streak} j.</Text>
+                <Text style={styles.habitStreak}>
+                  {habit.isCompleted ? 'Bravo' : 'À ton rythme'}
+                </Text>
               </Pressable>
+            ) : (
+              <View key={habit.id} style={[styles.habitRow, styles.quantifiedHabitRow]}>
+                <View style={[styles.habitCheck, habit.isCompleted && styles.habitCheckDone]}>
+                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                </View>
+                <View style={styles.quantifiedHabitCopy}>
+                  <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
+                    {habit.title}
+                  </Text>
+                  <HabitProgressControl
+                    habit={habit}
+                    onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
+                  />
+                </View>
+              </View>
             ))}
           </View>
         ) : (
@@ -243,12 +272,24 @@ export default function Dashboard() {
               returnKeyType="done"
               onSubmitEditing={() => void handleAddHabit()}
             />
+            <HabitGoalFields
+              type={newHabitGoalType}
+              target={newHabitGoalTarget}
+              unit={newHabitGoalUnit}
+              disabled={isSaving}
+              onTypeChange={setNewHabitGoalType}
+              onTargetChange={setNewHabitGoalTarget}
+              onUnitChange={setNewHabitGoalUnit}
+            />
             <WeekdaySelector selectedDays={newHabitDays} onChange={setNewHabitDays} disabled={isSaving} />
             {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
             <CosyButton
               title={isSaving ? 'Ajout en cours…' : 'Ajouter à ma journée'}
               onPress={() => void handleAddHabit()}
-              disabled={isSaving || !newHabitTitle.trim() || !newHabitDays.length}
+              disabled={isSaving || !newHabitTitle.trim() || !newHabitDays.length || (
+                newHabitGoalType !== 'check'
+                && (!/^\d+$/.test(newHabitGoalTarget) || Number(newHabitGoalTarget) < 1 || Number(newHabitGoalTarget) > 10000)
+              ) || (newHabitGoalType === 'count' && !newHabitGoalUnit.trim())}
               style={styles.modalButton}
             />
             <Pressable onPress={() => setIsModalVisible(false)} style={styles.cancelButton}>
@@ -532,6 +573,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     gap: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
+  },
+  quantifiedHabitRow: {
+    alignItems: 'flex-start',
+    paddingVertical: spacing.sm,
+  },
+  quantifiedHabitCopy: {
+    flex: 1,
   },
   habitCheck: {
     width: 20,

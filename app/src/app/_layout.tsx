@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { auth } from '@/services/firebase';
 import { OfflineSyncProvider } from '@/services/OfflineSyncProvider';
+import { PremiumProvider } from '@/services/PremiumProvider';
+import '@/services/contextualReminders';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 export default function RootLayout() {
@@ -63,7 +65,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <OfflineSyncProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <PremiumProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </PremiumProvider>
       </OfflineSyncProvider>
     </ThemeProvider>
   );

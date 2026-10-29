@@ -27,6 +27,8 @@ export interface TodoTask {
   description: string;
   priority: TaskPriority;
   dueDate: string | null;
+  startTime?: string | null;
+  durationMinutes?: number | null;
   completed: boolean;
   userId: string;
   createdAt: Timestamp;
@@ -116,6 +118,9 @@ export function useTasks() {
       description: input.description.trim(),
       priority: input.priority,
       dueDate: input.dueDate,
+      ...(taskId && tasks.find((task) => task.id === taskId)?.dueDate !== input.dueDate
+        ? { startTime: null, durationMinutes: null }
+        : {}),
       userId,
     };
 
@@ -165,6 +170,40 @@ export function useTasks() {
     setTasks((currentTasks) => applyPendingWrites(currentTasks, [write]));
   };
 
+  const scheduleTask = async (taskId: string, dueDate: string, startTime: string) => {
+    if (!db || !userId) throw new Error('Connecte-toi pour planifier un petit pas.');
+    if (!/^\d{2}:\d{2}$/.test(startTime)) throw new Error('Choisis un horaire valide.');
+    const [hours, minutes] = startTime.split(':').map(Number);
+    if (hours < 8 || hours >= 20 || ![0, 30].includes(minutes)) {
+      throw new Error('Le planning va de 8 h à 20 h, par pas de 30 minutes.');
+    }
+
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) throw new Error('Ce petit pas est introuvable sur cet appareil.');
+    const write = await queueOfflineWrite({
+      collectionKey: 'tasks',
+      documentId: taskId,
+      path: `tasks/${taskId}`,
+      kind: 'update',
+      data: { dueDate, startTime, durationMinutes: task.durationMinutes ?? 60 },
+    }, userId);
+    setTasks((currentTasks) => sortTasks(applyPendingWrites(currentTasks, [write])));
+  };
+
+  const unscheduleTask = async (taskId: string) => {
+    if (!db || !userId) throw new Error('Connecte-toi pour modifier ton planning.');
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) throw new Error('Ce petit pas est introuvable sur cet appareil.');
+    const write = await queueOfflineWrite({
+      collectionKey: 'tasks',
+      documentId: taskId,
+      path: `tasks/${taskId}`,
+      kind: 'update',
+      data: { startTime: null, durationMinutes: null },
+    }, userId);
+    setTasks((currentTasks) => sortTasks(applyPendingWrites(currentTasks, [write])));
+  };
+
   return {
     tasks: userId && loadedUserId === userId ? tasks : [],
     loading,
@@ -172,6 +211,8 @@ export function useTasks() {
     saveTask,
     toggleTask,
     deleteTask,
+    scheduleTask,
+    unscheduleTask,
   };
 }
 

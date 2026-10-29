@@ -11,12 +11,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
+import { DatePickerField } from '@/components/DatePickerField';
+import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
+import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
-import { ALL_HABIT_DAYS, type HabitDay, useHabits } from '@/hooks/useHabits';
+import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { TaskPriority, TodoTask, useTasks } from '@/hooks/useTasks';
 import { spacing, borderRadius, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -44,7 +47,7 @@ const isValidDate = (value: string) => {
 export default function TasksScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const { habits, loading, error, addHabit, toggleHabit } = useHabits();
+  const { habits, loading, error, addHabit, toggleHabit, updateHabitProgress } = useHabits();
   const {
     tasks,
     loading: tasksLoading,
@@ -57,6 +60,9 @@ export default function TasksScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
   const [habitDays, setHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
+  const [habitGoalType, setHabitGoalType] = useState<HabitGoalType>('check');
+  const [habitGoalTarget, setHabitGoalTarget] = useState('20');
+  const [habitGoalUnit, setHabitGoalUnit] = useState('pages');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
@@ -129,9 +135,17 @@ export default function TasksScreen() {
     setSaving(true);
     setSaveError('');
     try {
-      await addHabit(title, '🌱', habitDays);
+      const target = Number(habitGoalTarget);
+      await addHabit(title, '🌱', habitDays, {
+        type: habitGoalType,
+        target: habitGoalType === 'check' ? 1 : target,
+        unit: habitGoalUnit,
+      });
       setTitle('');
       setHabitDays(ALL_HABIT_DAYS);
+      setHabitGoalType('check');
+      setHabitGoalTarget('20');
+      setHabitGoalUnit('pages');
       setIsAdding(false);
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter ce petit pas.");
@@ -160,6 +174,20 @@ export default function TasksScreen() {
             <Text style={styles.progressSubtitle}>Même les petites victoires méritent d’être célébrées.</Text>
           </View>
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/time-tracking' as Href)}
+          style={styles.timeTrackingCard}>
+          <View style={styles.timeTrackingIcon}>
+            <Text style={styles.timeTrackingIconText}>◷</Text>
+          </View>
+          <View style={styles.timeTrackingCopy}>
+            <Text style={styles.timeTrackingTitle}>Suivre un moment</Text>
+            <Text style={styles.timeTrackingSubtitle}>Code, étude, loisir… à ton rythme.</Text>
+          </View>
+          <Text style={styles.taskArrow}>›</Text>
+        </Pressable>
 
         <View style={styles.sectionHeading}>
           <View>
@@ -269,14 +297,14 @@ export default function TasksScreen() {
 
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>À mon rythme</Text>
-          <Text style={styles.sectionCount}>{pending.length} habitude{pending.length > 1 ? 's' : ''}</Text>
+          <Text style={styles.sectionCount}>À ton rythme</Text>
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {loading ? (
           <ActivityIndicator color={colors.sage} style={styles.loader} />
         ) : visibleHabits.length ? (
           <View style={styles.taskList}>
-            {visibleHabits.map((habit) => (
+            {visibleHabits.map((habit) => habit.goalType === 'check' ? (
               <Pressable
                 key={habit.id}
                 accessibilityRole="checkbox"
@@ -298,12 +326,26 @@ export default function TasksScreen() {
                     {habit.title}
                   </Text>
                   <Text style={styles.taskMeta}>
-                    {habit.isCompleted ? 'Terminée aujourd’hui' : 'Un petit pas, à ton rythme'}
-                    {habit.streak > 0 ? ` · ${habit.streak} jours` : ''}
+                    {habit.isCompleted ? 'C’est fait, bravo.' : 'Un petit pas, à ton rythme'}
                   </Text>
                 </View>
                 <Text style={styles.taskArrow}>›</Text>
               </Pressable>
+            ) : (
+              <View key={habit.id} style={[styles.taskRow, styles.quantifiedRow]}>
+                <View style={[styles.checkbox, habit.isCompleted && styles.checkboxDone]}>
+                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                </View>
+                <View style={styles.taskCopy}>
+                  <Text style={[styles.taskTitle, habit.isCompleted && styles.taskTitleDone]}>
+                    {habit.title}
+                  </Text>
+                  <HabitProgressControl
+                    habit={habit}
+                    onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
+                  />
+                </View>
+              </View>
             ))}
           </View>
         ) : (
@@ -359,12 +401,24 @@ export default function TasksScreen() {
               returnKeyType="done"
               onSubmitEditing={() => void saveHabit()}
             />
+            <HabitGoalFields
+              type={habitGoalType}
+              target={habitGoalTarget}
+              unit={habitGoalUnit}
+              disabled={saving}
+              onTypeChange={setHabitGoalType}
+              onTargetChange={setHabitGoalTarget}
+              onUnitChange={setHabitGoalUnit}
+            />
             <WeekdaySelector selectedDays={habitDays} onChange={setHabitDays} disabled={saving} />
             {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
             <CosyButton
               title={saving ? 'Ajout en cours…' : 'Ajouter à ma journée'}
               onPress={() => void saveHabit()}
-              disabled={saving || !title.trim() || !habitDays.length}
+              disabled={saving || !title.trim() || !habitDays.length || (
+                habitGoalType !== 'check'
+                && (!/^\d+$/.test(habitGoalTarget) || Number(habitGoalTarget) < 1 || Number(habitGoalTarget) > 10000)
+              ) || (habitGoalType === 'count' && !habitGoalUnit.trim())}
               style={styles.modalAction}
             />
             <Pressable onPress={() => setIsAdding(false)} style={styles.cancel}>
@@ -420,15 +474,11 @@ export default function TasksScreen() {
                 );
               })}
             </View>
-            <TextInput
-              value={taskDueDate}
-              onChangeText={setTaskDueDate}
-              placeholder="Échéance (AAAA-MM-JJ, facultative)"
-              placeholderTextColor={colors.textLight}
-              style={styles.input}
-              editable={!savingTask}
-              maxLength={10}
-              autoCapitalize="none"
+            <DatePickerField
+              value={taskDueDate || null}
+              onChange={(date) => setTaskDueDate(date ?? '')}
+              disabled={savingTask}
+              placeholder="Choisir une date (facultatif)"
             />
             {taskError ? <Text style={styles.error}>{taskError}</Text> : null}
             <CosyButton
@@ -462,6 +512,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   progressCopy: { flex: 1 },
   progressTitle: { color: palette.sage, fontSize: 12, fontWeight: '700' },
   progressSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
+  timeTrackingCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginTop: spacing.sm },
+  timeTrackingIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: palette.sagePale },
+  timeTrackingIconText: { color: palette.sage, fontSize: 17 },
+  timeTrackingCopy: { flex: 1 },
+  timeTrackingTitle: { color: palette.textPrimary, fontSize: 10, fontWeight: '700' },
+  timeTrackingSubtitle: { color: palette.textSecondary, fontSize: 8, marginTop: 3 },
   filters: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.md },
   filterChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   filterChipSelected: { backgroundColor: palette.sage, borderColor: palette.sage },
@@ -488,6 +544,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   addTaskChip: { paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
   addTaskText: { color: palette.surface, fontSize: 10, fontWeight: '700' },
   taskRow: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: palette.border },
+  quantifiedRow: { alignItems: 'flex-start', paddingVertical: spacing.sm },
   checkbox: { width: 21, height: 21, borderRadius: 7, borderWidth: 1, borderColor: palette.sage, alignItems: 'center', justifyContent: 'center' },
   checkboxDone: { backgroundColor: palette.sage },
   checkmark: { color: palette.surface, fontSize: 13, fontWeight: '700' },

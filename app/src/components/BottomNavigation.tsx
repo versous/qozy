@@ -25,7 +25,9 @@ export function BottomNavigation({ active }: { active: Tab }) {
             key={tab.key}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            onPress={() => router.replace(tab.route)}
+            onPress={() => {
+              if (!selected) router.navigate(tab.route);
+            }}
             style={styles.item}>
             <Text style={[styles.icon, selected && styles.iconSelected]}>{tab.icon}</Text>
             <Text style={[styles.label, selected && styles.labelSelected]}>{tab.label}</Text>

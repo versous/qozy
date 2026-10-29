@@ -13,9 +13,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
+import { DatePickerField } from '@/components/DatePickerField';
+import { DayTimeline } from '@/components/DayTimeline';
 import { useHabits } from '@/hooks/useHabits';
 import { useTasks, type TaskPriority, type TodoTask } from '@/hooks/useTasks';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
@@ -78,6 +81,8 @@ export default function CalendarScreen() {
     toggleTask,
     saveTask,
     deleteTask,
+    scheduleTask,
+    unscheduleTask,
   } = useTasks();
   const [month, setMonth] = useState(() => {
     const current = new Date();
@@ -92,6 +97,7 @@ export default function CalendarScreen() {
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('normal');
   const [taskError, setTaskError] = useState('');
   const [savingTask, setSavingTask] = useState(false);
+  const [showDayTimeline, setShowDayTimeline] = useState(false);
   const cells = useMemo(() => getCalendarCells(month), [month]);
   const selectedDateObject = new Date(`${selectedDate}T00:00:00`);
   const selectedHabits = allHabits.filter((habit) =>
@@ -304,12 +310,24 @@ export default function CalendarScreen() {
             <Text style={styles.sectionTitle}>{selectedDateLabel}</Text>
             <Text style={styles.sectionSubtitle}>Tes petits pas pour cette journée.</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={openTaskModal}
-            style={styles.addTaskButton}>
-            <Text style={styles.addTaskButtonText}>＋ Ajouter</Text>
-          </Pressable>
+          <View style={styles.dayActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: showDayTimeline }}
+              onPress={() => setShowDayTimeline((value) => !value)}
+              style={[styles.timelineButton, showDayTimeline && styles.timelineButtonSelected]}>
+              <Text style={[styles.timelineButtonText, showDayTimeline && styles.timelineButtonTextSelected]}>
+                {showDayTimeline ? 'Montrer la liste' : 'Vue horaire'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter un petit pas"
+              onPress={openTaskModal}
+              style={styles.addTaskButton}>
+              <Text style={styles.addTaskButtonText}>＋</Text>
+            </Pressable>
+          </View>
         </View>
 
         {habitsError ? <Text style={styles.errorText}>{habitsError}</Text> : null}
@@ -318,7 +336,15 @@ export default function CalendarScreen() {
           <ActivityIndicator color={colors.sage} style={styles.loader} />
         ) : null}
 
-        {selectedTasks.map((task) => (
+        {showDayTimeline ? (
+          <DayTimeline
+            tasks={selectedTasks}
+            onSchedule={(taskId, startTime) => scheduleTask(taskId, selectedDate, startTime)}
+            onUnschedule={unscheduleTask}
+          />
+        ) : null}
+
+        {!showDayTimeline ? selectedTasks.map((task) => (
           <View key={task.id} style={styles.dayItem}>
             <Pressable
               accessibilityRole="checkbox"
@@ -351,11 +377,33 @@ export default function CalendarScreen() {
               <Text style={styles.taskDeleteIcon}>×</Text>
             </Pressable>
           </View>
-        ))}
+        )) : null}
 
         {selectedHabits.map((habit) => {
           const completed = habit.completedDates.includes(selectedDate);
           const canComplete = selectedDate <= todayKey;
+
+          if (habit.goalType !== 'check') {
+            const progress = habit.progressByDate[selectedDate] ?? 0;
+            const progressLabel = habit.goalType === 'timer'
+              ? `${Math.floor(progress / 60)} / ${habit.goalTarget} min`
+              : `${progress} / ${habit.goalTarget} ${habit.goalUnit}`;
+
+            return (
+              <View key={habit.id} style={styles.dayItem}>
+                <View style={[styles.checkbox, completed && styles.checkboxDone, styles.roundCheckbox]}>
+                  {completed ? <Text style={styles.checkmark}>✓</Text> : null}
+                </View>
+                <View style={styles.itemCopy}>
+                  <Text style={[styles.itemTitle, completed && styles.itemTitleDone]}>{habit.title}</Text>
+                  <Text style={styles.itemMeta}>
+                    {progressLabel} · {completed ? 'Objectif atteint' : canComplete ? 'À ton rythme' : 'Prévue'}
+                  </Text>
+                </View>
+                <Text style={styles.itemType}>HABITUDE</Text>
+              </View>
+            );
+          }
 
           return (
             <Pressable
@@ -386,7 +434,11 @@ export default function CalendarScreen() {
           </View>
         ) : null}
 
-        <View style={styles.premiumCard}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Découvrir les bilans et objectifs Qozy Premium"
+          onPress={() => router.push('/premium')}
+          style={styles.premiumCard}>
           <View style={styles.premiumHeader}>
             <View style={styles.premiumIcon}><Text style={styles.premiumIconText}>✦</Text></View>
             <View style={styles.premiumCopy}>
@@ -410,10 +462,8 @@ export default function CalendarScreen() {
               <Text style={styles.premiumFeatureText}>Objectifs du mois</Text>
             </View>
           </View>
-          <Text style={styles.premiumNote}>
-            Les analyses détaillées et rapports arriveront avec l’offre Premium.
-          </Text>
-        </View>
+          <Text style={styles.premiumNote}>Voir mes bilans et objectifs  ›</Text>
+        </Pressable>
       </ScrollView>
       <BottomNavigation active="calendar" />
 
@@ -475,15 +525,11 @@ export default function CalendarScreen() {
                   );
                 })}
               </View>
-              <TextInput
-                value={taskDueDate}
-                onChangeText={setTaskDueDate}
-                placeholder="Échéance (AAAA-MM-JJ, facultative)"
-                placeholderTextColor={colors.textLight}
-                style={styles.input}
-                editable={!savingTask}
-                maxLength={10}
-                autoCapitalize="none"
+              <DatePickerField
+                value={taskDueDate || null}
+                onChange={(date) => setTaskDueDate(date ?? '')}
+                disabled={savingTask}
+                placeholder="Choisir une date (facultatif)"
               />
               {taskError ? <Text style={styles.errorText}>{taskError}</Text> : null}
               <CosyButton
@@ -692,6 +738,32 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     borderRadius: borderRadius.extraLarge,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  dayActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  timelineButton: {
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.extraLarge,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: spacing.sm,
+  },
+  timelineButtonSelected: {
+    backgroundColor: palette.sagePale,
+    borderColor: palette.sage,
+  },
+  timelineButtonText: {
+    color: palette.sage,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  timelineButtonTextSelected: {
+    color: palette.sage,
   },
   addTaskButtonText: {
     color: palette.surface,

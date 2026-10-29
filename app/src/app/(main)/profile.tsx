@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { signOut } from 'firebase/auth';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useHabits } from '@/hooks/useHabits';
 import { auth } from '@/services/firebase';
+import { usePremium } from '@/services/PremiumProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
 
 export default function ProfileScreen() {
   const { colors, mode, toggleMode } = useAppTheme();
+  const { isPremium, isPreview } = usePremium();
   const isDark = mode === 'dark';
   const styles = createStyles(colors);
   const { habits, loading, error } = useHabits();
@@ -115,24 +117,52 @@ export default function ProfileScreen() {
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Mon espace Qozy</Text>
         </View>
-        <View style={styles.planCard}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/premium')}
+          style={({ pressed }) => [styles.planCard, pressed && styles.pressed]}>
           <View style={styles.planTop}>
             <View style={styles.planIcon}>
               <Text style={styles.planIconText}>☼</Text>
             </View>
             <View style={styles.planCopy}>
-              <Text style={styles.planTitle}>Ton espace essentiel</Text>
-              <Text style={styles.planSubtitle}>Un cocon pour avancer à ton rythme.</Text>
+              <Text style={styles.planTitle}>{isPremium ? 'Qozy Premium' : 'Découvrir Qozy Premium'}</Text>
+              <Text style={styles.planSubtitle}>
+                {isPremium ? 'Tes bilans et objectifs sont activés.' : 'Bilans, progression et objectifs personnalisés.'}
+              </Text>
             </View>
             <View style={styles.planBadge}>
-              <Text style={styles.planBadgeText}>ACTIF</Text>
+              <Text style={styles.planBadgeText}>
+                {isPreview ? 'APERÇU' : isPremium ? 'ACTIF' : 'DÉCOUVRIR'}
+              </Text>
             </View>
           </View>
           <View style={styles.planRule} />
           <Text style={styles.planNote}>
-            Les options Premium arrivent bientôt. Pour le moment, toutes les fonctionnalités affichées restent gratuites.
+            {isPreview
+              ? 'Mode aperçu développeur · aucun achat effectué.'
+              : isPremium
+                ? 'Appuie pour consulter tes progrès.'
+                : 'Appuie pour voir les formules et activer Premium.'}
           </Text>
+        </Pressable>
+
+        <View style={styles.sectionHeading}>
+          <Text style={styles.sectionTitle}>Mes rappels</Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/reminders' as Href)}
+          style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
+          <View style={[styles.menuIcon, styles.menuIconSage]}>
+            <Text style={styles.menuIconText}>◷</Text>
+          </View>
+          <View style={styles.menuCopy}>
+            <Text style={styles.menuTitle}>Rappels doux</Text>
+            <Text style={styles.menuSubtitle}>Choisir une heure ou un lieu</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </Pressable>
 
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Compte</Text>

@@ -8,9 +8,11 @@
     "scheme": "app",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.versous.qozy",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.versous.qozy",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -32,6 +34,17 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      "expo-sharing",
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Autoriser Qozy à enregistrer un lieu pour un rappel contextuel.",
+          "locationAlwaysAndWhenInUsePermission": "Autoriser Qozy à déclencher les rappels de lieu même lorsque l’application est fermée.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],

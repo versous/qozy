@@ -43,13 +43,7 @@ export function OfflineSyncProvider({ children }: React.PropsWithChildren) {
     () => defaultStatus
   );
 
-  const message = status.error
-    ? status.error
-    : status.pendingWrites > 0
-      ? `${status.pendingWrites} modification${status.pendingWrites === 1 ? '' : 's'} enregistrée${status.pendingWrites === 1 ? '' : 's'} ici, en attente de synchronisation.`
-      : status.isOnline === false
-        ? 'Hors connexion · tes données déjà chargées restent disponibles.'
-        : null;
+  const message = status.error;
 
   return (
     <View style={styles.container}>

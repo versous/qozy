@@ -71,13 +71,21 @@ export default function CalendarScreen() {
   const styles = createStyles(colors);
   const todayKey = getDateKey(new Date());
   const { allHabits, loading: habitsLoading, error: habitsError, toggleHabitForDate } = useHabits();
-  const { tasks, loading: tasksLoading, error: tasksError, toggleTask, saveTask } = useTasks();
+  const {
+    tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    toggleTask,
+    saveTask,
+    deleteTask,
+  } = useTasks();
   const [month, setMonth] = useState(() => {
     const current = new Date();
     return new Date(current.getFullYear(), current.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
+  const [editingTask, setEditingTask] = useState<TodoTask | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState(todayKey);
@@ -124,6 +132,24 @@ export default function CalendarScreen() {
     }
   };
 
+  const confirmDeleteTask = (task: TodoTask) => {
+    Alert.alert('Supprimer cette tâche ?', task.title, [
+      { text: 'Garder', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: () => {
+          void deleteTask(task.id).catch((reason) => {
+            Alert.alert(
+              'Suppression impossible',
+              reason instanceof Error ? reason.message : 'Réessaie plus tard.'
+            );
+          });
+        },
+      },
+    ]);
+  };
+
   const handleHabitToggle = async (habitId: string) => {
     try {
       await toggleHabitForDate(habitId, selectedDate);
@@ -136,10 +162,21 @@ export default function CalendarScreen() {
   };
 
   const openTaskModal = () => {
+    setEditingTask(null);
     setTaskTitle('');
     setTaskDescription('');
     setTaskDueDate(selectedDate);
     setTaskPriority('normal');
+    setTaskError('');
+    setIsTaskModalVisible(true);
+  };
+
+  const openEditTaskModal = (task: TodoTask) => {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskDescription(task.description);
+    setTaskDueDate(task.dueDate ?? '');
+    setTaskPriority(task.priority);
     setTaskError('');
     setIsTaskModalVisible(true);
   };
@@ -159,7 +196,7 @@ export default function CalendarScreen() {
         description: taskDescription,
         priority: taskPriority,
         dueDate: dueDate || null,
-      });
+      }, editingTask?.id);
       setIsTaskModalVisible(false);
     } catch (reason) {
       setTaskError(reason instanceof Error ? reason.message : 'Impossible d’enregistrer cette tâche.');
@@ -282,15 +319,15 @@ export default function CalendarScreen() {
         ) : null}
 
         {selectedTasks.map((task) => (
-          <Pressable
-            key={task.id}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: task.completed }}
-            onPress={() => void handleTaskToggle(task)}
-            style={styles.dayItem}>
-            <View style={[styles.checkbox, task.completed && styles.checkboxDone]}>
+          <View key={task.id} style={styles.dayItem}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel={task.completed ? `Rouvrir ${task.title}` : `Terminer ${task.title}`}
+              accessibilityState={{ checked: task.completed }}
+              onPress={() => void handleTaskToggle(task)}
+              style={[styles.checkbox, task.completed && styles.checkboxDone]}>
               {task.completed ? <Text style={styles.checkmark}>✓</Text> : null}
-            </View>
+            </Pressable>
             <View style={styles.itemCopy}>
               <Text style={[styles.itemTitle, task.completed && styles.itemTitleDone]}>
                 {task.title}
@@ -299,8 +336,21 @@ export default function CalendarScreen() {
                 {task.description || `Priorité ${getPriorityLabel(task).toLowerCase()}`}
               </Text>
             </View>
-            <Text style={styles.itemType}>TÂCHE</Text>
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Modifier ${task.title}`}
+              onPress={() => openEditTaskModal(task)}
+              style={styles.taskAction}>
+              <Text style={styles.taskEditIcon}>✎</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Supprimer ${task.title}`}
+              onPress={() => confirmDeleteTask(task)}
+              style={styles.taskAction}>
+              <Text style={styles.taskDeleteIcon}>×</Text>
+            </Pressable>
+          </View>
         ))}
 
         {selectedHabits.map((habit) => {
@@ -381,7 +431,9 @@ export default function CalendarScreen() {
             <View style={styles.modal}>
               <View style={styles.modalHandle} />
               <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
-              <Text style={styles.modalTitle}>Une nouvelle tâche</Text>
+              <Text style={styles.modalTitle}>
+                {editingTask ? 'Modifier ma tâche' : 'Une nouvelle tâche'}
+              </Text>
               <TextInput
                 value={taskTitle}
                 onChangeText={setTaskTitle}
@@ -435,7 +487,13 @@ export default function CalendarScreen() {
               />
               {taskError ? <Text style={styles.errorText}>{taskError}</Text> : null}
               <CosyButton
-                title={savingTask ? 'Enregistrement…' : 'Ajouter à ma journée'}
+                title={
+                  savingTask
+                    ? 'Enregistrement…'
+                    : editingTask
+                      ? 'Enregistrer'
+                      : 'Ajouter à ma journée'
+                }
                 onPress={() => void handleSaveTask()}
                 disabled={savingTask || !taskTitle.trim()}
                 style={styles.modalAction}
@@ -705,6 +763,21 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: 8,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  taskAction: {
+    alignItems: 'center',
+    height: 34,
+    justifyContent: 'center',
+    width: 28,
+  },
+  taskEditIcon: {
+    color: palette.sage,
+    fontSize: 17,
+  },
+  taskDeleteIcon: {
+    color: palette.textSecondary,
+    fontSize: 22,
+    lineHeight: 24,
   },
   emptyCard: {
     alignItems: 'center',

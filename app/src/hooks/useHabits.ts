@@ -5,15 +5,20 @@ import {
   collection,
   collectionGroup,
   doc,
-  getDocs,
   onSnapshot,
   query,
-  runTransaction,
   Timestamp,
   where,
-  writeBatch,
-  addDoc,
 } from 'firebase/firestore';
+import {
+  applyPendingWrites,
+  getCachedDocuments,
+  getPendingWrites,
+  queueOfflineWrite,
+  reportFirestoreConnectivity,
+  saveCachedDocuments,
+  type OfflineDocument,
+} from '../services/offlineStore';
 
 export interface Habit {
   id: string;
@@ -41,6 +46,7 @@ interface HabitDocument {
 }
 
 interface CompletionDocument {
+  id: string;
   habitId: string;
   date: string;
   userId: string;
@@ -118,15 +124,31 @@ export const useHabits = () => {
   useEffect(() => {
     if (!userId || !db) return;
     let habitDocuments: HabitDocument[] = [];
-    const completionDates = new Map<string, Set<string>>();
+    let completionDocuments: CompletionDocument[] = [];
     let habitsLoaded = false;
     let completionsLoaded = false;
+    let active = true;
+    let serverHabitsLoaded = false;
+    let serverCompletionsLoaded = false;
 
-    const updateHabits = () => {
+    const updateHabits = async () => {
       if (!habitsLoaded || !completionsLoaded) return;
 
-      setHabits(
-        habitDocuments.map((habit) => {
+      const [habitWrites, completionWrites] = await Promise.all([
+        getPendingWrites(userId, 'habits'),
+        getPendingWrites(userId, 'habitCompletions'),
+      ]);
+      if (!active) return;
+      const visibleHabits = applyPendingWrites(habitDocuments, habitWrites);
+      const visibleCompletions = applyPendingWrites(completionDocuments, completionWrites);
+      const completionDates = new Map<string, Set<string>>();
+      visibleCompletions.forEach((completion) => {
+        const dates = completionDates.get(completion.habitId) ?? new Set<string>();
+        dates.add(completion.date);
+        completionDates.set(completion.habitId, dates);
+      });
+
+      setHabits(visibleHabits.map((habit) => {
           const dates = completionDates.get(habit.id) ?? new Set<string>();
           const frequencyDays = normalizeFrequencyDays(habit.frequencyDays);
           return {
@@ -138,8 +160,7 @@ export const useHabits = () => {
             frequencyDays,
             createdAt: habit.createdAt ?? Timestamp.now(),
           };
-        })
-      );
+        }));
       setLoadedUserId(userId);
       setError(null);
     };
@@ -156,16 +177,43 @@ export const useHabits = () => {
       setError('Impossible de charger les habitudes. Vérifie ta connexion puis réessaie.');
     };
 
+    void Promise.all([
+      getCachedDocuments<HabitDocument & OfflineDocument>(userId, 'habits'),
+      getCachedDocuments<CompletionDocument>(userId, 'habitCompletions'),
+    ]).then(([cachedHabits, cachedCompletions]) => {
+      if (!active || serverHabitsLoaded || serverCompletionsLoaded) return;
+      habitDocuments = cachedHabits;
+      completionDocuments = cachedCompletions;
+      habitsLoaded = true;
+      completionsLoaded = true;
+      void updateHabits();
+    }).catch((reason: unknown) => {
+      if (active) {
+        setError(reason instanceof Error
+          ? `Impossible de lire les habitudes enregistrées sur cet appareil : ${reason.message}`
+          : 'Impossible de lire les habitudes enregistrées sur cet appareil.');
+      }
+    });
+
     const habitsQuery = query(collection(db, 'habits'), where('userId', '==', userId));
     const unsubscribeHabits = onSnapshot(
       habitsQuery,
+      { includeMetadataChanges: true },
       (snapshot) => {
+        if (!snapshot.metadata.fromCache) serverHabitsLoaded = true;
         habitDocuments = snapshot.docs.map((habit) => ({
           ...(habit.data() as HabitDocument),
           id: habit.id,
         }));
         habitsLoaded = true;
-        updateHabits();
+        void saveCachedDocuments(userId, 'habits', habitDocuments)
+          .then(updateHabits)
+          .catch((reason: unknown) => {
+            if (active) setError(reason instanceof Error
+              ? `Impossible d’enregistrer les habitudes localement : ${reason.message}`
+              : 'Impossible d’enregistrer les habitudes localement.');
+          });
+        reportFirestoreConnectivity(userId, !snapshot.metadata.fromCache);
       },
       handleError
     );
@@ -176,22 +224,29 @@ export const useHabits = () => {
     );
     const unsubscribeCompletions = onSnapshot(
       completionsQuery,
+      { includeMetadataChanges: true },
       (snapshot) => {
-        completionDates.clear();
-        snapshot.docs.forEach((completion) => {
+        if (!snapshot.metadata.fromCache) serverCompletionsLoaded = true;
+        completionDocuments = snapshot.docs.flatMap((completion) => {
           const data = completion.data() as CompletionDocument;
-          if (!data.habitId || !data.date) return;
-          const dates = completionDates.get(data.habitId) ?? new Set<string>();
-          dates.add(data.date);
-          completionDates.set(data.habitId, dates);
+          if (!data.habitId || !data.date) return [];
+          return [{ ...data, id: `${data.habitId}:${data.date}` }];
         });
         completionsLoaded = true;
-        updateHabits();
+        void saveCachedDocuments(userId, 'habitCompletions', completionDocuments)
+          .then(updateHabits)
+          .catch((reason: unknown) => {
+            if (active) setError(reason instanceof Error
+              ? `Impossible d’enregistrer l’historique localement : ${reason.message}`
+              : 'Impossible d’enregistrer l’historique localement.');
+          });
+        reportFirestoreConnectivity(userId, !snapshot.metadata.fromCache);
       },
       handleError
     );
 
     return () => {
+      active = false;
       unsubscribeHabits();
       unsubscribeCompletions();
     };
@@ -207,13 +262,29 @@ export const useHabits = () => {
     if (!trimmedTitle) throw new Error('Le nom de l’habitude ne peut pas être vide.');
     if (!frequencyDays.length) throw new Error('Choisis au moins un jour pour cette habitude.');
 
-    await addDoc(collection(db, 'habits'), {
-      title: trimmedTitle,
-      icon,
-      frequencyDays: [...new Set(frequencyDays)],
-      userId,
-      createdAt: Timestamp.now(),
-    });
+    const habitId = doc(collection(db, 'habits')).id;
+    const write = await queueOfflineWrite({
+      collectionKey: 'habits',
+      documentId: habitId,
+      path: `habits/${habitId}`,
+      kind: 'set',
+      data: {
+        title: trimmedTitle,
+        icon,
+        frequencyDays: [...new Set(frequencyDays)],
+        userId,
+        createdAt: Timestamp.now(),
+      },
+    }, userId);
+    setHabits((current) => applyPendingWrites(current, [write]).map((habit) => ({
+      ...habit,
+      streak: habit.streak ?? 0,
+      isCompleted: habit.isCompleted ?? false,
+      completedDates: habit.completedDates ?? [],
+      frequencyDays: normalizeFrequencyDays(habit.frequencyDays),
+      icon: habit.icon ?? '🌱',
+      createdAt: habit.createdAt ?? Timestamp.now(),
+    })));
   };
 
   const toggleHabitForDate = async (habitId: string, date: string) => {
@@ -223,27 +294,35 @@ export const useHabits = () => {
     }
     if (date > today) throw new Error('Une habitude future ne peut pas être validée.');
 
-    const habitRef = doc(db, 'habits', habitId);
-    const completionRef = doc(db, 'habits', habitId, 'completions', date);
+    const habit = habits.find((item) => item.id === habitId);
+    if (!habit || habit.userId !== userId) throw new Error('Cette habitude est introuvable sur cet appareil.');
+    if (!habit.frequencyDays.includes(new Date(`${date}T00:00:00`).getDay() as HabitDay)) {
+      throw new Error('Cette habitude n’est pas prévue ce jour-là.');
+    }
 
-    await runTransaction(db, async (transaction) => {
-      const habit = await transaction.get(habitRef);
-      if (!habit.exists() || habit.data().userId !== userId) {
-        throw new Error('Cette habitude est introuvable.');
-      }
-      if (!normalizeFrequencyDays(habit.data().frequencyDays).includes(
-        new Date(`${date}T00:00:00`).getDay() as HabitDay
-      )) {
-        throw new Error('Cette habitude n’est pas prévue ce jour-là.');
-      }
+    const isCompleted = habit.completedDates.includes(date);
+    const completionId = `${habitId}:${date}`;
+    const write = await queueOfflineWrite({
+      collectionKey: 'habitCompletions',
+      documentId: completionId,
+      path: `habits/${habitId}/completions/${date}`,
+      kind: isCompleted ? 'delete' : 'set',
+      data: isCompleted ? undefined : { habitId, date, userId },
+    }, userId);
 
-      const completion = await transaction.get(completionRef);
-      if (completion.exists()) {
-        transaction.delete(completionRef);
-      } else {
-        transaction.set(completionRef, { habitId, date, userId });
-      }
-    });
+    setHabits((currentHabits) => currentHabits.map((currentHabit) => {
+      if (currentHabit.id !== habitId) return currentHabit;
+      const dates = new Set(currentHabit.completedDates);
+      if (isCompleted) dates.delete(date);
+      else dates.add(date);
+      return {
+        ...currentHabit,
+        completedDates: [...dates],
+        isCompleted: dates.has(today),
+        streak: getStreak(dates, today, currentHabit.frequencyDays),
+      };
+    }));
+    return write;
   };
 
   const toggleHabit = async (habitId: string) => toggleHabitForDate(habitId, today);
@@ -251,29 +330,24 @@ export const useHabits = () => {
   const deleteHabit = async (habitId: string) => {
     if (!db || !userId) throw new Error('Connectez-vous pour supprimer une habitude.');
 
-    const habitRef = doc(db, 'habits', habitId);
-    const habit = await runTransaction(db, async (transaction) => {
-      const snapshot = await transaction.get(habitRef);
-      if (!snapshot.exists() || snapshot.data().userId !== userId) {
-        throw new Error('Cette habitude est introuvable.');
-      }
-      return snapshot;
-    });
+    const habit = habits.find((item) => item.id === habitId);
+    if (!habit || habit.userId !== userId) throw new Error('Cette habitude est introuvable sur cet appareil.');
 
-    const completions = await getDocs(collection(db, 'habits', habit.id, 'completions'));
-    for (let index = 0; index < completions.docs.length; index += 500) {
-      const batch = writeBatch(db);
-      completions.docs.slice(index, index + 500).forEach((completion) => batch.delete(completion.ref));
-      await batch.commit();
+    for (const date of habit.completedDates) {
+      await queueOfflineWrite({
+        collectionKey: 'habitCompletions',
+        documentId: `${habitId}:${date}`,
+        path: `habits/${habitId}/completions/${date}`,
+        kind: 'delete',
+      }, userId);
     }
-
-    await runTransaction(db, async (transaction) => {
-      const currentHabit = await transaction.get(habitRef);
-      if (!currentHabit.exists() || currentHabit.data().userId !== userId) {
-        throw new Error('Cette habitude est introuvable.');
-      }
-      transaction.delete(habitRef);
-    });
+    const write = await queueOfflineWrite({
+      collectionKey: 'habits',
+      documentId: habitId,
+      path: `habits/${habitId}`,
+      kind: 'delete',
+    }, userId);
+    setHabits((current) => applyPendingWrites(current, [write]));
   };
 
   return {

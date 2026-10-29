@@ -1,11 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, TextInput } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { CosyButton } from '@/components/common/CosyButton';
 import { auth, isFirebaseConfigured } from '@/services/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
 
@@ -14,8 +27,44 @@ const AuthScreen = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
+  const [noticeMessage, setNoticeMessage] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const passwordInput = React.useRef<TextInput>(null);
+  const confirmPasswordInput = React.useRef<TextInput>(null);
+
+  const handlePasswordReset = async () => {
+    if (!auth || !isFirebaseConfigured) {
+      setErrorMessage('Configurez Firebase dans le fichier .env pour continuer.');
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage('Saisis ton adresse e-mail pour recevoir le lien de réinitialisation.');
+      return;
+    }
+
+    setErrorMessage('');
+    setNoticeMessage('');
+    setIsSubmitting(true);
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setNoticeMessage('Si un compte correspond à cette adresse, un lien de réinitialisation vient d’être envoyé.');
+    } catch (error) {
+      if (error instanceof FirebaseError && error.code === 'auth/invalid-email') {
+        setErrorMessage('Saisis une adresse e-mail valide.');
+      } else if (error instanceof FirebaseError && error.code === 'auth/network-request-failed') {
+        setErrorMessage('Connexion réseau impossible. Réessaie.');
+      } else {
+        setErrorMessage('Impossible d’envoyer le lien pour le moment. Réessaie.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!auth || !isFirebaseConfigured) {
@@ -24,6 +73,7 @@ const AuthScreen = () => {
     }
 
     setErrorMessage('');
+    setNoticeMessage('');
     if (isRegistering && password !== confirmPassword) {
       setErrorMessage('Les mots de passe ne correspondent pas.');
       return;
@@ -63,79 +113,137 @@ const AuthScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {isRegistering ? 'Créer votre compte Qozy ✨' : 'Bienvenue chez Qozy ✨'}
-          </Text>
-          <Text style={styles.subtitle}>Votre espace de sérénité et de productivité</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="exemple@mail.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Text style={styles.brand}>nid</Text>
+            <Text style={styles.title}>
+              {isRegistering ? 'Créer votre compte' : 'Ravi de te retrouver'}
+            </Text>
+            <Text style={styles.subtitle}>Ton espace de sérénité et de productivité.</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={isRegistering ? 'new-password' : 'current-password'}
-            />
-          </View>
-
-          {isRegistering ? (
+          <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirmer le mot de passe</Text>
+              <Text style={styles.label}>Adresse e-mail</Text>
               <TextInput
                 style={styles.input}
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoComplete="new-password"
+                placeholder="exemple@mail.com"
+                placeholderTextColor={colors.textLight}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInput.current?.focus()}
               />
             </View>
-          ) : null}
 
-          <CosyButton
-            title={
-              isSubmitting
-                ? (isRegistering ? 'Création...' : 'Connexion...')
-                : (isRegistering ? 'Créer mon compte' : 'Se connecter')
-            }
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-            style={styles.loginButton}
-          />
-          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-          <Text
-            accessibilityRole="button"
-            onPress={() => {
-              setIsRegistering((current) => !current);
-              setErrorMessage('');
-            }}
-            style={styles.switchMode}
-          >
-            {isRegistering
-              ? 'Déjà un compte ? Se connecter'
-              : 'Pas encore de compte ? S’inscrire'}
-          </Text>
-        </View>
-      </View>
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Mot de passe</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={isPasswordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  onPress={() => setIsPasswordVisible((visible) => !visible)}
+                  hitSlop={8}>
+                  <Text style={styles.visibilityToggle}>{isPasswordVisible ? 'Masquer' : 'Afficher'}</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                ref={passwordInput}
+                style={styles.input}
+                placeholder="Saisis ton mot de passe"
+                placeholderTextColor={colors.textLight}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!isPasswordVisible}
+                autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                returnKeyType={isRegistering ? 'next' : 'done'}
+                onSubmitEditing={() => {
+                  if (isRegistering) confirmPasswordInput.current?.focus();
+                  else void handleSubmit();
+                }}
+              />
+            </View>
+
+            {!isRegistering ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void handlePasswordReset()}
+                disabled={isSubmitting}
+                style={styles.forgotPassword}>
+                <Text style={styles.visibilityToggle}>Mot de passe oublié ?</Text>
+              </Pressable>
+            ) : null}
+
+            {isRegistering ? (
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>Confirmer le mot de passe</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={isConfirmPasswordVisible ? 'Masquer la confirmation' : 'Afficher la confirmation'}
+                    onPress={() => setIsConfirmPasswordVisible((visible) => !visible)}
+                    hitSlop={8}>
+                    <Text style={styles.visibilityToggle}>{isConfirmPasswordVisible ? 'Masquer' : 'Afficher'}</Text>
+                  </Pressable>
+                </View>
+                <TextInput
+                  ref={confirmPasswordInput}
+                  style={styles.input}
+                  placeholder="Saisis à nouveau ton mot de passe"
+                  placeholderTextColor={colors.textLight}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!isConfirmPasswordVisible}
+                  autoComplete="new-password"
+                  returnKeyType="done"
+                  onSubmitEditing={() => void handleSubmit()}
+                />
+              </View>
+            ) : null}
+
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+            {noticeMessage ? <Text style={styles.notice}>{noticeMessage}</Text> : null}
+            <CosyButton
+              title={
+                isSubmitting
+                  ? (isRegistering ? 'Création…' : 'Connexion…')
+                  : (isRegistering ? 'Créer mon compte' : 'Se connecter')
+              }
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+              style={styles.loginButton}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsRegistering((current) => !current);
+                setErrorMessage('');
+                setNoticeMessage('');
+                setIsPasswordVisible(false);
+                setIsConfirmPasswordVisible(false);
+              }}
+              style={styles.switchMode}>
+              <Text style={styles.switchModeText}>
+                {isRegistering
+                  ? 'Déjà un compte ? Se connecter'
+                  : 'Pas encore de compte ? S’inscrire'}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -145,20 +253,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
+  keyboardAvoidingView: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.lg,
+    paddingVertical: spacing.xl,
   },
   header: {
     alignItems: 'center',
     marginBottom: spacing.xl,
+  },
+  brand: {
+    color: colors.textPrimary,
+    fontSize: 44,
+    lineHeight: 52,
+    fontFamily: 'serif',
+    fontWeight: '700',
+    marginBottom: spacing.sm,
   },
   title: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
     textAlign: 'center',
+    fontFamily: 'serif',
   },
   subtitle: {
     fontSize: typography.sizes.md,
@@ -167,17 +288,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   form: {
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   inputGroup: {
     gap: 8,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
     fontSize: typography.sizes.sm,
     fontWeight: '500',
     color: colors.textPrimary,
   },
+  visibilityToggle: {
+    color: colors.sage,
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+  },
   input: {
+    minHeight: 54,
     backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: borderRadius.medium,
@@ -195,7 +331,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: typography.sizes.sm,
   },
+  notice: {
+    color: colors.sage,
+    textAlign: 'center',
+    fontSize: typography.sizes.sm,
+    lineHeight: 20,
+  },
   switchMode: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  switchModeText: {
     color: colors.primary,
     textAlign: 'center',
     fontSize: typography.sizes.sm,

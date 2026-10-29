@@ -3,10 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing } from '@/theme/colors';
 
-type Tab = 'today' | 'tasks' | 'account';
+type Tab = 'today' | 'calendar' | 'tasks' | 'account';
 
 const tabs: { key: Tab; label: string; icon: string; route: Href }[] = [
   { key: 'today', label: "Aujourd'hui", icon: '⌂', route: '/' },
+  { key: 'calendar', label: 'Calendrier', icon: '▦', route: '/calendar' },
   { key: 'tasks', label: 'Mes tâches', icon: '☷', route: '/tasks' },
   { key: 'account', label: 'Mon compte', icon: '♙', route: '/profile' },
 ];

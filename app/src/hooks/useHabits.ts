@@ -20,16 +20,23 @@ export interface Habit {
   title: string;
   streak: number;
   isCompleted: boolean;
+  completedDates: string[];
   icon: string;
+  frequencyDays: HabitDay[];
   userId: string;
   createdAt: Timestamp;
 }
+
+export type HabitDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const ALL_HABIT_DAYS: HabitDay[] = [0, 1, 2, 3, 4, 5, 6];
 
 interface HabitDocument {
   id: string;
   title: string;
   userId: string;
   icon?: string;
+  frequencyDays?: unknown;
   createdAt?: Timestamp;
 }
 
@@ -47,13 +54,42 @@ const getPreviousDateKey = (dateKey: string) => {
   return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
 };
 
-const getStreak = (completionDates: Set<string>, today: string) => {
-  let date = completionDates.has(today) ? today : getPreviousDateKey(today);
+const normalizeFrequencyDays = (days: unknown): HabitDay[] => {
+  if (!Array.isArray(days)) return ALL_HABIT_DAYS;
+  const validDays = days.filter(
+    (day): day is HabitDay =>
+      typeof day === 'number' && ALL_HABIT_DAYS.includes(day as HabitDay)
+  );
+  return validDays.length ? validDays : ALL_HABIT_DAYS;
+};
+
+const getPreviousScheduledDateKey = (dateKey: string, frequencyDays: HabitDay[]) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    date.setUTCDate(date.getUTCDate() - 1);
+    if (frequencyDays.includes(date.getUTCDay() as HabitDay)) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+
+  return getPreviousDateKey(dateKey);
+};
+
+const getStreak = (
+  completionDates: Set<string>,
+  today: string,
+  frequencyDays: HabitDay[]
+) => {
+  let date = completionDates.has(today)
+    ? today
+    : getPreviousScheduledDateKey(today, frequencyDays);
   let streak = 0;
 
   while (completionDates.has(date)) {
     streak += 1;
-    date = getPreviousDateKey(date);
+    date = getPreviousScheduledDateKey(date, frequencyDays);
   }
 
   return streak;
@@ -92,11 +128,14 @@ export const useHabits = () => {
       setHabits(
         habitDocuments.map((habit) => {
           const dates = completionDates.get(habit.id) ?? new Set<string>();
+          const frequencyDays = normalizeFrequencyDays(habit.frequencyDays);
           return {
             ...habit,
-            streak: getStreak(dates, today),
+            streak: getStreak(dates, today, frequencyDays),
             isCompleted: dates.has(today),
+            completedDates: [...dates],
             icon: habit.icon ?? '🌱',
+            frequencyDays,
             createdAt: habit.createdAt ?? Timestamp.now(),
           };
         })
@@ -158,39 +197,56 @@ export const useHabits = () => {
     };
   }, [today, userId]);
 
-  const addHabit = async (title: string, icon = '🌱') => {
+  const addHabit = async (
+    title: string,
+    icon = '🌱',
+    frequencyDays: HabitDay[] = ALL_HABIT_DAYS
+  ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour ajouter une habitude.');
     const trimmedTitle = title.trim();
     if (!trimmedTitle) throw new Error('Le nom de l’habitude ne peut pas être vide.');
+    if (!frequencyDays.length) throw new Error('Choisis au moins un jour pour cette habitude.');
 
     await addDoc(collection(db, 'habits'), {
       title: trimmedTitle,
       icon,
+      frequencyDays: [...new Set(frequencyDays)],
       userId,
       createdAt: Timestamp.now(),
     });
   };
 
-  const toggleHabit = async (habitId: string) => {
+  const toggleHabitForDate = async (habitId: string, date: string) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier vos habitudes.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || getDateKey(new Date(`${date}T00:00:00`)) !== date) {
+      throw new Error('Cette date est invalide.');
+    }
+    if (date > today) throw new Error('Une habitude future ne peut pas être validée.');
 
     const habitRef = doc(db, 'habits', habitId);
-    const completionRef = doc(db, 'habits', habitId, 'completions', today);
+    const completionRef = doc(db, 'habits', habitId, 'completions', date);
 
     await runTransaction(db, async (transaction) => {
       const habit = await transaction.get(habitRef);
       if (!habit.exists() || habit.data().userId !== userId) {
         throw new Error('Cette habitude est introuvable.');
       }
+      if (!normalizeFrequencyDays(habit.data().frequencyDays).includes(
+        new Date(`${date}T00:00:00`).getDay() as HabitDay
+      )) {
+        throw new Error('Cette habitude n’est pas prévue ce jour-là.');
+      }
 
       const completion = await transaction.get(completionRef);
       if (completion.exists()) {
         transaction.delete(completionRef);
       } else {
-        transaction.set(completionRef, { habitId, date: today, userId });
+        transaction.set(completionRef, { habitId, date, userId });
       }
     });
   };
+
+  const toggleHabit = async (habitId: string) => toggleHabitForDate(habitId, today);
 
   const deleteHabit = async (habitId: string) => {
     if (!db || !userId) throw new Error('Connectez-vous pour supprimer une habitude.');
@@ -221,11 +277,15 @@ export const useHabits = () => {
   };
 
   return {
-    habits: userId && loadedUserId === userId ? habits : [],
+    habits: userId && loadedUserId === userId
+      ? habits.filter((habit) => habit.frequencyDays.includes(new Date().getDay() as HabitDay))
+      : [],
+    allHabits: userId && loadedUserId === userId ? habits : [],
     loading,
     error,
     addHabit,
     toggleHabit,
+    toggleHabitForDate,
     deleteHabit,
   };
 };

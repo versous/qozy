@@ -15,7 +15,8 @@ import { router } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
-import { useHabits } from '@/hooks/useHabits';
+import { WeekdaySelector } from '@/components/WeekdaySelector';
+import { ALL_HABIT_DAYS, type HabitDay, useHabits } from '@/hooks/useHabits';
 import { TaskPriority, TodoTask, useTasks } from '@/hooks/useTasks';
 import { colors, spacing, borderRadius } from '@/theme/colors';
 
@@ -52,6 +53,7 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<Filter>('active');
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
+  const [habitDays, setHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
@@ -124,8 +126,9 @@ export default function TasksScreen() {
     setSaving(true);
     setSaveError('');
     try {
-      await addHabit(title);
+      await addHabit(title, '🌱', habitDays);
       setTitle('');
+      setHabitDays(ALL_HABIT_DAYS);
       setIsAdding(false);
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter ce petit pas.");
@@ -353,11 +356,12 @@ export default function TasksScreen() {
               returnKeyType="done"
               onSubmitEditing={() => void saveHabit()}
             />
+            <WeekdaySelector selectedDays={habitDays} onChange={setHabitDays} disabled={saving} />
             {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
             <CosyButton
               title={saving ? 'Ajout en cours…' : 'Ajouter à ma journée'}
               onPress={() => void saveHabit()}
-              disabled={saving || !title.trim()}
+              disabled={saving || !title.trim() || !habitDays.length}
               style={styles.modalAction}
             />
             <Pressable onPress={() => setIsAdding(false)} style={styles.cancel}>

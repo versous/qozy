@@ -16,7 +16,8 @@ import { router } from 'expo-router';
 
 import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { useHabits } from '@/hooks/useHabits';
+import { WeekdaySelector } from '@/components/WeekdaySelector';
+import { ALL_HABIT_DAYS, type HabitDay, useHabits } from '@/hooks/useHabits';
 import { auth } from '@/services/firebase';
 import { borderRadius, colors, spacing } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const { habits, loading, error, addHabit, toggleHabit } = useHabits();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState('');
+  const [newHabitDays, setNewHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const firstName = auth?.currentUser?.displayName?.split(' ')[0] || 'toi';
@@ -45,8 +47,9 @@ export default function Dashboard() {
     setIsSaving(true);
     setSaveError('');
     try {
-      await addHabit(newHabitTitle);
+      await addHabit(newHabitTitle, '🌱', newHabitDays);
       setNewHabitTitle('');
+      setNewHabitDays(ALL_HABIT_DAYS);
       setIsModalVisible(false);
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter l'habitude.");
@@ -237,11 +240,12 @@ export default function Dashboard() {
               returnKeyType="done"
               onSubmitEditing={() => void handleAddHabit()}
             />
+            <WeekdaySelector selectedDays={newHabitDays} onChange={setNewHabitDays} disabled={isSaving} />
             {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
             <CosyButton
               title={isSaving ? 'Ajout en cours…' : 'Ajouter à ma journée'}
               onPress={() => void handleAddHabit()}
-              disabled={isSaving || !newHabitTitle.trim()}
+              disabled={isSaving || !newHabitTitle.trim() || !newHabitDays.length}
               style={styles.modalButton}
             />
             <Pressable onPress={() => setIsModalVisible(false)} style={styles.cancelButton}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { DatePickerField } from '@/components/DatePickerField';
+import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { DayTimeline } from '@/components/DayTimeline';
 import { useHabits } from '@/hooks/useHabits';
 import { useTasks, type TaskPriority, type TodoTask } from '@/hooks/useTasks';
@@ -90,6 +91,7 @@ export default function CalendarScreen() {
   });
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
+  const dismissTaskSheet = useCallback(() => setIsTaskModalVisible(false), [setIsTaskModalVisible]);
   const [editingTask, setEditingTask] = useState<TodoTask | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -470,16 +472,18 @@ export default function CalendarScreen() {
       <Modal
         visible={isTaskModalVisible}
         transparent
-        animationType="slide"
-        onRequestClose={() => setIsTaskModalVisible(false)}>
+        animationType="none"
+        onRequestClose={dismissTaskSheet}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}>
-          <ScrollView
-            contentContainerStyle={styles.modalScrollContent}
-            keyboardShouldPersistTaps="handled">
-            <View style={styles.modal}>
-              <View style={styles.modalHandle} />
+          <SwipeDismissSheet
+            visible={isTaskModalVisible}
+            onDismiss={dismissTaskSheet}
+            style={styles.modal}>
+            <ScrollView
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled">
               <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
               <Text style={styles.modalTitle}>
                 {editingTask ? 'Modifier ma tâche' : 'Une nouvelle tâche'}
@@ -550,8 +554,8 @@ export default function CalendarScreen() {
                 style={styles.cancelButton}>
                 <Text style={styles.cancelButtonText}>Pas maintenant</Text>
               </Pressable>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </SwipeDismissSheet>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -976,14 +980,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     backgroundColor: palette.background,
     borderTopLeftRadius: borderRadius.large,
     borderTopRightRadius: borderRadius.large,
-  },
-  modalHandle: {
-    width: 38,
-    height: 4,
-    alignSelf: 'center',
-    borderRadius: 2,
-    backgroundColor: palette.border,
-    marginBottom: spacing.md,
   },
   modalEyebrow: {
     color: palette.sage,

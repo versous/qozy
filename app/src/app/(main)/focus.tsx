@@ -1,10 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAudioPlaylist, useAudioPlaylistStatus } from 'expo-audio';
-
 import { useTimer } from '@/hooks/useTimer';
+import { useMusic } from '@/services/MusicProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -32,20 +31,10 @@ function FocusSession({ activity, duration }: { activity: string; duration: numb
     duration,
     () => Alert.alert('Belle séance', 'Tu as pris ce temps pour toi. Bravo.')
   );
-  const audioPlayer = useAudioPlaylist({
-    sources: [require('@/assets/audio/meditation-ambience.wav')],
-    loop: 'single',
-  });
-  const audioStatus = useAudioPlaylistStatus(audioPlayer);
-
-  useEffect(() => {
-    audioPlayer.play();
-    return () => audioPlayer.pause();
-  }, [audioPlayer]);
+  const music = useMusic();
 
   const leaveSession = () => {
     pauseTimer();
-    audioPlayer.pause();
     router.back();
   };
 
@@ -91,11 +80,11 @@ function FocusSession({ activity, duration }: { activity: string; duration: numb
           ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={audioStatus.playing ? 'Mettre l’ambiance en pause' : 'Reprendre l’ambiance sonore'}
-            onPress={() => audioStatus.playing ? audioPlayer.pause() : audioPlayer.play()}
+            accessibilityLabel={music.isPlaying ? 'Mettre l’ambiance en pause' : 'Reprendre l’ambiance sonore'}
+            onPress={music.togglePlayback}
             style={styles.musicButton}>
             <Text style={styles.musicButtonText}>
-              {audioStatus.playing ? '♫  Ambiance activée · Pause' : '♫  Reprendre l’ambiance'}
+              {music.isPlaying ? '♫  Ambiance activée · Pause' : '♫  Reprendre l’ambiance'}
             </Text>
           </Pressable>
         </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { CosyButton } from '@/components/common/CosyButton';
 import { DatePickerField } from '@/components/DatePickerField';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
+import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type Habit, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { TaskPriority, TodoTask, useTasks } from '@/hooks/useTasks';
@@ -67,6 +68,8 @@ export default function TasksScreen() {
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
+  const dismissHabitSheet = useCallback(() => setIsAdding(false), [setIsAdding]);
+  const dismissTaskSheet = useCallback(() => setIsTaskModalVisible(false), [setIsTaskModalVisible]);
   const [editingTask, setEditingTask] = useState<TodoTask | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -463,10 +466,9 @@ export default function TasksScreen() {
 
       <BottomNavigation active="tasks" />
 
-      <Modal visible={isAdding} transparent animationType="slide" onRequestClose={() => setIsAdding(false)}>
+      <Modal visible={isAdding} transparent animationType="none" onRequestClose={dismissHabitSheet}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modal}>
-            <View style={styles.handle} />
+          <SwipeDismissSheet visible={isAdding} onDismiss={dismissHabitSheet} style={styles.modal}>
             <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
             <Text style={styles.modalTitle}>{editingHabit ? 'Modifier mon habitude' : 'Un petit pas'}</Text>
             <TextInput
@@ -503,18 +505,17 @@ export default function TasksScreen() {
             <Pressable onPress={() => setIsAdding(false)} style={styles.cancel}>
               <Text style={styles.cancelText}>Pas maintenant</Text>
             </Pressable>
-          </View>
+          </SwipeDismissSheet>
         </View>
       </Modal>
 
       <Modal
         visible={isTaskModalVisible}
         transparent
-        animationType="slide"
-        onRequestClose={() => setIsTaskModalVisible(false)}>
+        animationType="none"
+        onRequestClose={dismissTaskSheet}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modal}>
-            <View style={styles.handle} />
+          <SwipeDismissSheet visible={isTaskModalVisible} onDismiss={dismissTaskSheet} style={styles.modal}>
             <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
             <Text style={styles.modalTitle}>{editingTask ? 'Modifier ma tâche' : 'Nouvelle tâche'}</Text>
             <TextInput
@@ -569,7 +570,7 @@ export default function TasksScreen() {
             <Pressable onPress={() => setIsTaskModalVisible(false)} style={styles.cancel}>
               <Text style={styles.cancelText}>Pas maintenant</Text>
             </Pressable>
-          </View>
+          </SwipeDismissSheet>
         </View>
       </Modal>
     </SafeAreaView>
@@ -650,7 +651,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   addButton: { backgroundColor: palette.sage, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(42,48,39,0.38)' },
   modal: { padding: spacing.lg, paddingBottom: spacing.xl, backgroundColor: palette.background, borderTopLeftRadius: borderRadius.large, borderTopRightRadius: borderRadius.large },
-  handle: { width: 38, height: 4, alignSelf: 'center', borderRadius: 2, backgroundColor: palette.border, marginBottom: spacing.md },
   modalEyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 1, textAlign: 'center' },
   modalTitle: { color: palette.textPrimary, fontSize: 22, fontFamily: 'serif', fontWeight: '600', textAlign: 'center', marginVertical: spacing.sm },
   input: { minHeight: 50, backgroundColor: palette.surface, borderRadius: borderRadius.small, borderWidth: 1, borderColor: palette.border, paddingHorizontal: spacing.md, color: palette.textPrimary },

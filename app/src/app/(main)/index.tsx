@@ -1,13 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +22,7 @@ import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
+import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { useHydration } from '@/hooks/useHydration';
@@ -196,6 +195,7 @@ export default function Dashboard() {
   const { habits, allHabits, loading, error, addHabit, toggleHabit, updateHabitProgress, deleteHabit } = useHabits();
   const hydration = useHydration();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const dismissHabitSheet = useCallback(() => setIsModalVisible(false), []);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitDays, setNewHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
   const [newHabitGoalType, setNewHabitGoalType] = useState<HabitGoalType>('check');
@@ -206,6 +206,10 @@ export default function Dashboard() {
   const [saveError, setSaveError] = useState('');
   const [isActivityModalVisible, setIsActivityModalVisible] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const dismissActivitySheet = useCallback(() => {
+    setIsActivityModalVisible(false);
+    setEditingActivity(null);
+  }, []);
   const [newActivityTitle, setNewActivityTitle] = useState('');
   const [newActivityDetail, setNewActivityDetail] = useState('');
   const [newActivityDuration, setNewActivityDuration] = useState('10');
@@ -219,31 +223,6 @@ export default function Dashboard() {
   const [customActivities, setCustomActivities] = useState<Activity[]>([]);
   const [loadedActivityUserId, setLoadedActivityUserId] = useState<string | null>(null);
   const cleanedLireHabitsUserId = React.useRef<string | null>(null);
-  const [activityModalDragY] = useState(() => new Animated.Value(0));
-  const activityModalPanResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_event, gesture) =>
-      gesture.dy > 6 && gesture.dy > Math.abs(gesture.dx),
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderMove: (_event, gesture) => activityModalDragY.setValue(Math.max(0, gesture.dy)),
-    onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dy > 70 || gesture.vy > 0.8) {
-        setIsActivityModalVisible(false);
-        setEditingActivity(null);
-        activityModalDragY.setValue(0);
-      } else {
-        Animated.spring(activityModalDragY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      }
-    },
-    onPanResponderTerminate: () => {
-      Animated.spring(activityModalDragY, {
-        toValue: 0,
-        useNativeDriver: true,
-      }).start();
-    },
-  }), [activityModalDragY]);
   const firstName = auth?.currentUser?.displayName?.split(' ')[0] || 'toi';
   const userId = auth?.currentUser?.uid ?? null;
   const visibleCustomActivities = userId && loadedActivityUserId === userId ? customActivities : [];
@@ -838,12 +817,14 @@ export default function Dashboard() {
 
       <Modal
         visible={isModalVisible}
-        animationType="slide"
+        animationType="none"
         transparent
-        onRequestClose={() => setIsModalVisible(false)}>
+        onRequestClose={dismissHabitSheet}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
+          <SwipeDismissSheet
+            visible={isModalVisible}
+            onDismiss={dismissHabitSheet}
+            style={styles.modalContent}>
             <Text style={styles.modalEyebrow}>UN PETIT PAS POUR TOI</Text>
             <Text style={styles.modalTitle}>Nouvelle habitude</Text>
             <TextInput
@@ -880,36 +861,23 @@ export default function Dashboard() {
             <Pressable onPress={() => setIsModalVisible(false)} style={styles.cancelButton}>
               <Text style={styles.cancelText}>Pas maintenant</Text>
             </Pressable>
-          </View>
+          </SwipeDismissSheet>
         </View>
       </Modal>
 
       <Modal
         visible={isActivityModalVisible}
-        animationType="slide"
+        animationType="none"
         transparent
-        onRequestClose={() => {
-          setIsActivityModalVisible(false);
-          setEditingActivity(null);
-        }}>
+        onRequestClose={dismissActivitySheet}>
         <View style={styles.modalOverlay}>
-          <ScrollView
-            contentContainerStyle={styles.activityModalScroll}
-            keyboardShouldPersistTaps="handled">
-            <Animated.View
-              style={[styles.activityModal, { transform: [{ translateY: activityModalDragY }] }]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer en faisant glisser vers le bas"
-                onPress={() => {
-                  setIsActivityModalVisible(false);
-                  setEditingActivity(null);
-                }}
-                {...activityModalPanResponder.panHandlers}
-                style={styles.modalHandleTarget}>
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalSwipeHint}>Glisse vers le bas pour fermer</Text>
-              </Pressable>
+          <SwipeDismissSheet
+            visible={isActivityModalVisible}
+            onDismiss={dismissActivitySheet}
+            style={styles.activityModal}>
+            <ScrollView
+              contentContainerStyle={styles.activityModalScroll}
+              keyboardShouldPersistTaps="handled">
               <Text style={styles.modalEyebrow}>À TON IMAGE</Text>
               <Text style={styles.modalTitle}>{editingActivity ? 'Modifier mon petit moment' : 'Créer un petit moment'}</Text>
               <Text style={styles.activityFormLabel}>Comment l’appeler ?</Text>
@@ -1139,8 +1107,8 @@ export default function Dashboard() {
               }} style={styles.cancelButton}>
                 <Text style={styles.cancelText}>Pas maintenant</Text>
               </Pressable>
-            </Animated.View>
-          </ScrollView>
+            </ScrollView>
+          </SwipeDismissSheet>
         </View>
       </Modal>
     </SafeAreaView>
@@ -2013,24 +1981,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: 9,
     textAlign: 'center',
     marginTop: spacing.xs,
-  },
-  modalHandle: {
-    width: 38,
-    height: 4,
-    alignSelf: 'center',
-    borderRadius: 2,
-    backgroundColor: palette.border,
-  },
-  modalHandleTarget: {
-    minHeight: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  modalSwipeHint: {
-    color: palette.textSecondary,
-    fontSize: 8,
-    marginTop: 5,
   },
   modalEyebrow: {
     color: palette.sage,

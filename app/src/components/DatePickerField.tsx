@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -53,6 +54,7 @@ export function DatePickerField({
   const [month, setMonth] = useState(() => value
     ? new Date(parseDate(value).getFullYear(), parseDate(value).getMonth(), 1)
     : new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const dismissDatePicker = useCallback(() => setIsOpen(false), []);
   const cells = getMonthCells(month);
   const today = getDateKey(new Date());
   const monthLabel = month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -104,11 +106,10 @@ export function DatePickerField({
       <Modal
         visible={isOpen}
         transparent
-        animationType="fade"
-        onRequestClose={() => setIsOpen(false)}>
+        animationType="none"
+        onRequestClose={dismissDatePicker}>
         <SafeAreaView style={styles.modalBackdrop}>
-          <View style={styles.modal}>
-            <View style={styles.modalHandle} />
+          <SwipeDismissSheet visible={isOpen} onDismiss={dismissDatePicker} style={styles.modal}>
             <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
             <Text style={styles.modalTitle}>Choisir un jour</Text>
             <View style={styles.monthHeader}>
@@ -173,7 +174,7 @@ export function DatePickerField({
               style={styles.cancelButton}>
               <Text style={styles.cancelText}>Fermer</Text>
             </Pressable>
-          </View>
+          </SwipeDismissSheet>
         </SafeAreaView>
       </Modal>
     </>
@@ -192,7 +193,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   clearText: { color: palette.textSecondary, fontSize: 22 },
   modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(0,0,0,0.42)' },
   modal: { padding: spacing.md, borderRadius: borderRadius.large, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border },
-  modalHandle: { width: 36, height: 4, alignSelf: 'center', borderRadius: 2, backgroundColor: palette.border, marginBottom: spacing.md },
   modalEyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 1, fontWeight: '700' },
   modalTitle: { color: palette.textPrimary, fontSize: 20, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },

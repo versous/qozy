@@ -1,40 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAudioPlaylist, useAudioPlaylistStatus } from 'expo-audio';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
-import { useTimer } from '@/hooks/useTimer';
-import { usePremium } from '@/services/PremiumProvider';
+import { useMusic } from '@/services/MusicProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
-
-const phases = ['Inspirez', 'Retenez', 'Expirez', 'Retenez'] as const;
 
 export default function BreathingScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
   const { activity: requestedActivity, minutes: requestedMinutes } =
     useLocalSearchParams<{ activity?: string; minutes?: string }>();
-  const activity = requestedActivity ?? 'Revenir à soi';
-  const { isPremium } = usePremium();
+  const [activity, setActivity] = useState(requestedActivity ?? 'Méditer');
   const parsedMinutes = Number(requestedMinutes);
-  const duration = Number.isInteger(parsedMinutes) && parsedMinutes > 0 && parsedMinutes <= 30
+  const initialDuration = Number.isInteger(parsedMinutes) && parsedMinutes > 0 && parsedMinutes <= 60
     ? parsedMinutes
-    : 5;
-  const { secondsLeft, isActive, startTimer, pauseTimer, resetTimer } = useTimer(duration);
-  const audioPlayer = useAudioPlaylist({
-    sources: [require('@/assets/audio/meditation-ambience.wav')],
-    loop: 'single',
-  });
-  const audioStatus = useAudioPlaylistStatus(audioPlayer);
-  const elapsed = duration * 60 - secondsLeft;
-  const phaseIndex = Math.floor(elapsed / 4) % phases.length;
-  const phaseSecond = secondsLeft === 0 ? 0 : 4 - (elapsed % 4);
-  const cycle = Math.min(Math.floor(elapsed / 16) + 1, Math.ceil((duration * 60) / 16));
-  const progress = secondsLeft === 0 ? 1 : elapsed / (duration * 60);
+    : 10;
+  const [duration, setDuration] = useState(initialDuration);
+  const music = useMusic();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -59,43 +45,41 @@ export default function BreathingScreen() {
           />
           <View style={styles.imageScrim} />
           <Text style={styles.imageLabel}>RESPIRATION CARRÉE</Text>
-          <View style={[styles.breathCircle, isActive && styles.breathCircleActive]}>
-            <Text style={styles.phaseLabel}>{secondsLeft === 0 ? 'Tout doucement' : phases[phaseIndex]}</Text>
-            <Text style={styles.phaseSecond}>{secondsLeft === 0 ? '♡' : phaseSecond}</Text>
-            <Text style={styles.secondsLabel}>{secondsLeft === 0 ? 'Tu peux revenir quand tu veux' : 'secondes'}</Text>
+          <View style={styles.breathCircle}>
+            <Text style={styles.phaseLabel}>Un instant pour toi</Text>
+            <Text style={styles.phaseSecond}>♡</Text>
+            <Text style={styles.secondsLabel}>Respire à ton rythme</Text>
           </View>
-          <Text style={styles.breathHint}>Inspire 4 s · Retiens 4 s · Expire 4 s · Retiens 4 s</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-          </View>
-          <Text style={styles.cycleLabel}>
-            {secondsLeft === 0 ? 'Ta parenthèse est terminée.' : `Cycle ${cycle} sur ${Math.ceil((duration * 60) / 16)}`}
-          </Text>
         </View>
 
         <Text style={styles.encouragement}>Votre petite parenthèse de calme.</Text>
         <View style={styles.musicCard}>
           <View style={styles.musicCopy}>
-            <Text style={styles.musicTitle}>Musique douce pour méditer</Text>
-            <Text style={styles.musicSubtitle}>Une ambiance originale, à écouter en boucle.</Text>
+            <Text style={styles.musicTitle} numberOfLines={1}>{music.currentTrack.title}</Text>
+            <Text style={styles.musicSubtitle}>{music.currentTrack.artist} · Musique en boucle</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={audioStatus.playing ? 'Mettre la musique en pause' : 'Écouter la musique de méditation'}
-            onPress={() => {
-              if (!isPremium) {
-                router.push('/premium');
-              } else if (audioStatus.playing) {
-                audioPlayer.pause();
-              } else {
-                audioPlayer.play();
-              }
-            }}
+            accessibilityLabel={music.isPlaying ? 'Mettre la musique en pause' : 'Reprendre la musique'}
+            onPress={music.togglePlayback}
             style={styles.musicButton}>
-            <Text style={styles.musicButtonText}>
-              {isPremium ? (audioStatus.playing ? 'Ⅱ  Pause' : '▷  Écouter') : '✦  Premium'}
-            </Text>
+            <Text style={styles.musicButtonText}>{music.isPlaying ? 'Ⅱ  Pause' : '▷  Écouter'}</Text>
           </Pressable>
+        </View>
+        <Text style={styles.durationHeading}>Combien de temps pour toi ?</Text>
+        <View style={styles.durationOptions}>
+          {[5, 10, 15, 20, 30, 45, 60].map((minutes) => (
+            <Pressable
+              key={minutes}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: duration === minutes }}
+              onPress={() => setDuration(minutes)}
+              style={[styles.durationOption, duration === minutes && styles.durationOptionSelected]}>
+              <Text style={[styles.durationText, duration === minutes && styles.durationTextSelected]}>
+                {minutes} min
+              </Text>
+            </Pressable>
+          ))}
         </View>
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>À écouter, à votre rythme</Text>
@@ -107,7 +91,10 @@ export default function BreathingScreen() {
         ].map((item) => (
           <Pressable
             key={item.title}
-            onPress={() => router.replace({ pathname: '/breathing', params: { activity: item.title, minutes: String(item.minutes) } })}
+            onPress={() => {
+              setActivity(item.title);
+              setDuration(item.minutes);
+            }}
             style={styles.audioCard}>
             <View style={styles.audioIcon}><Text style={styles.audioIconText}>{item.icon}</Text></View>
             <View style={styles.audioCopy}>
@@ -120,24 +107,13 @@ export default function BreathingScreen() {
 
         <View style={styles.controls}>
           <CosyButton
-            title={secondsLeft === 0 ? 'Recommencer' : isActive ? 'Mettre en pause' : 'Commencer doucement'}
-            onPress={() => {
-              if (secondsLeft === 0) {
-                resetTimer();
-                startTimer();
-              } else if (isActive) {
-                pauseTimer();
-              } else {
-                startTimer();
-              }
-            }}
+            title="Commencer doucement"
+            onPress={() => router.push({
+              pathname: '/meditation-session',
+              params: { activity, minutes: String(duration) },
+            })}
             style={styles.primaryButton}
           />
-          {isActive ? (
-            <Pressable onPress={resetTimer} style={styles.resetButton}>
-              <Text style={styles.resetText}>Recommencer le cycle</Text>
-            </Pressable>
-          ) : null}
         </View>
       </ScrollView>
       <BottomNavigation active="today" />
@@ -161,14 +137,9 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.16)' },
   imageLabel: { position: 'absolute', top: spacing.md, color: palette.sage, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
   breathCircle: { width: 178, height: 178, alignItems: 'center', justifyContent: 'center', borderRadius: 89, borderWidth: 1, borderColor: palette.sage, backgroundColor: palette.surface },
-  breathCircleActive: { borderWidth: 7, borderColor: palette.sageLight },
   phaseLabel: { color: palette.sage, fontSize: 13, fontWeight: '600' },
   phaseSecond: { color: palette.sage, fontSize: 52, fontFamily: 'serif', lineHeight: 60 },
   secondsLabel: { color: palette.textSecondary, fontSize: 9 },
-  breathHint: { position: 'absolute', bottom: 42, color: palette.textPrimary, fontSize: 8, textAlign: 'center' },
-  progressTrack: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 28, height: 3, borderRadius: 2, backgroundColor: 'rgba(101,121,95,0.2)' },
-  progressFill: { height: '100%', borderRadius: 2, backgroundColor: palette.sage },
-  cycleLabel: { position: 'absolute', bottom: 11, color: palette.sage, fontSize: 8, fontWeight: '600' },
   encouragement: { color: palette.textSecondary, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
   musicCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.peachLight, marginBottom: spacing.md },
   musicCopy: { flex: 1, gap: 4 },
@@ -176,6 +147,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   musicSubtitle: { color: palette.textSecondary, fontSize: 9, lineHeight: 14 },
   musicButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
   musicButtonText: { color: palette.surface, fontSize: 9, fontWeight: '700' },
+  durationHeading: { color: palette.textPrimary, fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },
+  durationOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+  durationOption: { minWidth: 48, alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 8, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  durationOptionSelected: { backgroundColor: palette.sage, borderColor: palette.sage },
+  durationText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600' },
+  durationTextSelected: { color: palette.surface },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
   seeAll: { color: palette.sage, fontSize: 10, fontWeight: '600' },
@@ -188,6 +165,4 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   playIcon: { color: palette.sage, fontSize: 17, paddingHorizontal: spacing.xs },
   controls: { alignItems: 'stretch', marginTop: spacing.sm },
   primaryButton: { backgroundColor: palette.sage, borderWidth: 0 },
-  resetButton: { alignItems: 'center', padding: spacing.sm },
-  resetText: { color: palette.textSecondary, fontSize: 10 },
 });

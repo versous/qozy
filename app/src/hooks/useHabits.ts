@@ -357,6 +357,78 @@ export const useHabits = () => {
     })));
   };
 
+  const updateHabit = async (
+    habitId: string,
+    title: string,
+    frequencyDays: HabitDay[],
+    goal: HabitGoal
+  ) => {
+    if (!db || !userId) throw new Error('Connectez-vous pour modifier une habitude.');
+    const habit = habits.find((item) => item.id === habitId);
+    if (!habit || habit.userId !== userId) {
+      throw new Error('Cette habitude est introuvable sur cet appareil.');
+    }
+    if (goal.type !== habit.goalType) {
+      throw new Error('Le type de suivi ne peut pas changer afin de préserver l’historique.');
+    }
+
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) throw new Error('Le nom de l’habitude ne peut pas être vide.');
+    if (!frequencyDays.length) throw new Error('Choisis au moins un jour pour cette habitude.');
+    if (!['check', 'count', 'timer'].includes(goal.type)) throw new Error('Choisis un type d’objectif valide.');
+    if (!Number.isFinite(goal.target) || goal.target < 1 || goal.target > 10000) {
+      throw new Error('L’objectif doit être compris entre 1 et 10 000.');
+    }
+    if (goal.type === 'check' && goal.target !== 1) {
+      throw new Error('Une habitude simple ne peut pas avoir de cible chiffrée.');
+    }
+    if (goal.type === 'count' && !goal.unit.trim()) {
+      throw new Error('Précise l’unité de ton objectif.');
+    }
+
+    const updatedHabit = {
+      title: trimmedTitle,
+      frequencyDays: [...new Set(frequencyDays)],
+      goalType: goal.type,
+      goalTarget: goal.type === 'check' ? 1 : goal.target,
+      goalUnit: normalizeGoalUnit(goal.unit, goal.type),
+    };
+    const write = await queueOfflineWrite({
+      collectionKey: 'habits',
+      documentId: habitId,
+      path: `habits/${habitId}`,
+      kind: 'update',
+      data: updatedHabit,
+    }, userId);
+    setHabits((current) => applyPendingWrites(current, [write]).map((item) => {
+      const frequencyDays = normalizeFrequencyDays(item.frequencyDays);
+      const progressByDate = item.progressByDate ?? {};
+      const completedDatesSet = new Set(item.completedDates ?? []);
+      if (item.goalType !== 'check') {
+        Object.entries(progressByDate).forEach(([date, progress]) => {
+          if (progress >= getCompletionTarget(item)) completedDatesSet.add(date);
+          else completedDatesSet.delete(date);
+        });
+      }
+      const completedDates = [...completedDatesSet];
+      return {
+        ...item,
+        streak: getStreak(new Set(completedDates), today, frequencyDays),
+        isCompleted: completedDatesSet.has(today),
+        completedDates,
+        frequencyDays,
+        trackedDates: item.trackedDates ?? [],
+        progressByDate,
+        todayProgress: item.todayProgress ?? 0,
+        goalType: normalizeGoalType(item.goalType),
+        goalTarget: normalizeGoalTarget(item.goalTarget),
+        goalUnit: normalizeGoalUnit(item.goalUnit, normalizeGoalType(item.goalType)),
+        icon: item.icon ?? '🌱',
+        createdAt: item.createdAt ?? Timestamp.now(),
+      };
+    }));
+  };
+
   const toggleHabitForDate = async (habitId: string, date: string) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier vos habitudes.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || getDateKey(new Date(`${date}T00:00:00`)) !== date) {
@@ -528,6 +600,7 @@ export const useHabits = () => {
     loading,
     error,
     addHabit,
+    updateHabit,
     toggleHabit,
     toggleHabitForDate,
     updateHabitProgress,

@@ -1,11 +1,11 @@
 import React from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
-import { Exercise, useExercises } from '@/hooks/useExercises';
+import { Exercise, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -13,9 +13,9 @@ export default function MovementScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
   const { exercises, today, loading, error, toggleCompleted } = useExercises();
-  const todaysExercises = exercises.filter((exercise) => exercise.selectedDate === today);
-  const completed = todaysExercises.filter((exercise) => exercise.completedDate === today).length;
-  const nextExercise = todaysExercises.find((exercise) => exercise.completedDate !== today);
+  const todaysExercises = exercises.filter((exercise) => isExerciseScheduledOnDate(exercise, today));
+  const completed = todaysExercises.filter((exercise) => (exercise.completedDates ?? []).includes(today)).length;
+  const nextExercise = todaysExercises.find((exercise) => !(exercise.completedDates ?? []).includes(today));
   const formatDate = new Date().toLocaleDateString('fr-FR', {
     weekday: 'short',
     day: '2-digit',
@@ -82,25 +82,40 @@ export default function MovementScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {todaysExercises.map((exercise) => {
-          const isDone = exercise.completedDate === today;
+          const isDone = (exercise.completedDates ?? []).includes(today);
           return (
-            <Pressable
-              key={exercise.id}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isDone }}
-              onPress={() => void handleToggle(exercise)}
-              style={styles.exerciseCard}>
-              <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
-                {isDone ? <Text style={styles.checkmark}>✓</Text> : null}
-              </View>
-              <View style={styles.exerciseCopy}>
-                <Text style={[styles.exerciseName, isDone && styles.exerciseNameDone]}>{exercise.name}</Text>
-                <Text style={styles.exerciseMeta}>
-                  {exercise.duration} min · {exercise.intensity} · {isDone ? 'Terminé' : exercise.equipment}
-                </Text>
-              </View>
-              <Text style={styles.arrow}>›</Text>
-            </Pressable>
+            <View key={exercise.id} style={styles.exerciseCard}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isDone }}
+                accessibilityLabel={`${isDone ? 'Décocher' : 'Cocher'} ${exercise.name}`}
+                onPress={() => void handleToggle(exercise)}
+                style={styles.exerciseAction}>
+                <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
+                  {isDone ? <Text style={styles.checkmark}>✓</Text> : null}
+                </View>
+                <View style={styles.exerciseCopy}>
+                  <Text style={[styles.exerciseName, isDone && styles.exerciseNameDone]}>{exercise.name}</Text>
+                  <Text style={styles.exerciseMeta}>
+                    {exercise.duration} min · {exercise.intensity} · {isDone ? 'Terminé' : exercise.equipment}
+                  </Text>
+                </View>
+              </Pressable>
+              {exercise.routineEnabled ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ouvrir le calendrier Premium de ${exercise.name}`}
+                  onPress={() => router.push({
+                    pathname: '/routine-calendar',
+                    params: { kind: 'exercise', id: exercise.id, title: exercise.name },
+                  } as Href)}
+                  hitSlop={8}
+                  style={styles.calendarButton}>
+                  <Text style={styles.calendarIcon}>▦</Text>
+                </Pressable>
+              ) : null}
+              {!exercise.routineEnabled ? <Text style={styles.arrow}>›</Text> : null}
+            </View>
           );
         })}
 
@@ -136,6 +151,7 @@ export default function MovementScreen() {
         {todaysExercises.length && completed === todaysExercises.length ? (
           <Text style={styles.congrats}>C’est fait, bravo. Chaque pas compte.</Text>
         ) : null}
+
       </ScrollView>
       <BottomNavigation active="tasks" />
     </SafeAreaView>
@@ -172,6 +188,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   sectionCount: { color: palette.textSecondary, fontSize: 9 },
   error: { color: palette.error, fontSize: 10, marginBottom: spacing.sm },
   exerciseCard: { minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  exerciseAction: { flex: 1, minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   checkbox: { width: 21, height: 21, borderRadius: 7, borderWidth: 1, borderColor: palette.sage, alignItems: 'center', justifyContent: 'center' },
   checkboxDone: { backgroundColor: palette.sage },
   checkmark: { color: palette.surface, fontSize: 13, fontWeight: '700' },
@@ -180,6 +197,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   exerciseNameDone: { color: palette.textSecondary, textDecorationLine: 'line-through' },
   exerciseMeta: { color: palette.textSecondary, fontSize: 8, marginTop: 3 },
   arrow: { color: palette.sage, fontSize: 21 },
+  calendarButton: { padding: spacing.xs },
+  calendarIcon: { color: palette.sage, fontSize: 15 },
   emptyCard: { padding: spacing.md, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   emptyTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
   emptyText: { color: palette.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4 },

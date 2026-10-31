@@ -10,6 +10,7 @@ interface HabitGoalFieldsProps {
   target: string;
   unit: string;
   disabled?: boolean;
+  typeLocked?: boolean;
   onTypeChange: (type: HabitGoalType) => void;
   onTargetChange: (target: string) => void;
   onUnitChange: (unit: string) => void;
@@ -26,6 +27,7 @@ export function HabitGoalFields({
   target,
   unit,
   disabled = false,
+  typeLocked = false,
   onTypeChange,
   onTargetChange,
   onUnitChange,
@@ -35,7 +37,11 @@ export function HabitGoalFields({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Comment veux-tu suivre cet objectif ?</Text>
+      <Text style={styles.label}>
+        {typeLocked
+          ? 'Type de suivi conservé pour préserver ton historique.'
+          : 'Comment veux-tu suivre cet objectif ?'}
+      </Text>
       <View style={styles.options}>
         {goalTypes.map((option) => {
           const selected = type === option.value;
@@ -43,8 +49,8 @@ export function HabitGoalFields({
             <Pressable
               key={option.value}
               accessibilityRole="radio"
-              accessibilityState={{ checked: selected, disabled }}
-              disabled={disabled}
+              accessibilityState={{ checked: selected, disabled: disabled || typeLocked }}
+              disabled={disabled || typeLocked}
               onPress={() => onTypeChange(option.value)}
               style={[styles.option, selected && styles.optionSelected]}>
               <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{option.label}</Text>

@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
+import { getPermissionsAsync, requestPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
+import { setNotificationHandler } from 'expo-notifications/build/NotificationsHandler';
+import { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notifications.types';
+import { AndroidImportance } from 'expo-notifications/build/NotificationChannelManager.types';
+import { cancelScheduledNotificationAsync } from 'expo-notifications/build/cancelScheduledNotificationAsync';
+import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
+import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
@@ -45,7 +51,7 @@ export const DEFAULT_REMINDERS: ContextualReminders = {
   },
 };
 
-Notifications.setNotificationHandler({
+setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -76,7 +82,7 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(GEOFENCE_TASK)) {
     const reminders = JSON.parse(stored) as ContextualReminders;
     if (!reminders.location.enabled) return;
 
-    await Notifications.scheduleNotificationAsync({
+    await scheduleNotificationAsync({
       content: {
         title: 'Un petit moment pour toi',
         body: reminders.location.message,
@@ -108,15 +114,15 @@ async function ensureNotificationPermission() {
   }
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
+    await setNotificationChannelAsync(ANDROID_CHANNEL, {
       name: 'Rappels doux',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: AndroidImportance.DEFAULT,
       sound: null,
     });
   }
 
-  let permission = await Notifications.getPermissionsAsync();
-  if (!permission.granted) permission = await Notifications.requestPermissionsAsync();
+  let permission = await getPermissionsAsync();
+  if (!permission.granted) permission = await requestPermissionsAsync();
   if (!permission.granted) {
     throw new Error('Autorise les notifications dans les réglages de ton téléphone pour activer ce rappel.');
   }
@@ -133,7 +139,7 @@ export async function saveTimeReminder(
 
   if (reminder.enabled) {
     await ensureNotificationPermission();
-    const newNotificationId = await Notifications.scheduleNotificationAsync({
+    const newNotificationId = await scheduleNotificationAsync({
       content: {
         title: 'Un petit moment pour toi',
         body: reminder.message,
@@ -141,7 +147,7 @@ export async function saveTimeReminder(
         ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL } : {}),
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        type: SchedulableTriggerInputTypes.DAILY,
         hour: reminder.hour,
         minute: reminder.minute,
       },
@@ -151,17 +157,17 @@ export async function saveTimeReminder(
     try {
       await saveContextualReminders(updated);
     } catch (error) {
-      await Notifications.cancelScheduledNotificationAsync(newNotificationId);
+      await cancelScheduledNotificationAsync(newNotificationId);
       throw error;
     }
     if (current.time.notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(current.time.notificationId);
+      await cancelScheduledNotificationAsync(current.time.notificationId);
     }
     return updated;
   }
 
   if (current.time.notificationId) {
-    await Notifications.cancelScheduledNotificationAsync(current.time.notificationId);
+    await cancelScheduledNotificationAsync(current.time.notificationId);
   }
   updated.time.notificationId = null;
   await saveContextualReminders(updated);
@@ -199,22 +205,35 @@ export async function saveLocationReminder(
     throw new Error('Autorise la localisation en arrière-plan pour recevoir le rappel même lorsque Qozy est fermé.');
   }
 
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
+  let latitude: number;
+  let longitude: number;
+  if (current.location.enabled
+    && typeof current.location.latitude === 'number'
+    && Number.isFinite(current.location.latitude)
+    && typeof current.location.longitude === 'number'
+    && Number.isFinite(current.location.longitude)) {
+    latitude = current.location.latitude;
+    longitude = current.location.longitude;
+  } else {
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    latitude = position.coords.latitude;
+    longitude = position.coords.longitude;
+  }
   const updated: ContextualReminders = {
     ...current,
     location: {
       ...reminder,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
+      latitude,
+      longitude,
     },
   };
 
   await Location.startGeofencingAsync(GEOFENCE_TASK, [{
     identifier: GEOFENCE_ID,
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
+    latitude,
+    longitude,
     radius: 150,
     notifyOnEnter: true,
     notifyOnExit: false,

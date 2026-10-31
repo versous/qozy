@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+
 import { auth, db } from '@/services/firebase';
+import { ALL_HABIT_DAYS, type HabitDay } from '@/hooks/useHabits';
 import {
   collection,
   doc,
@@ -26,12 +28,29 @@ export interface Exercise {
   note: string;
   selectedDate: string | null;
   completedDate: string | null;
+  completedDates?: string[];
+  routineDays?: HabitDay[];
+  routineEnabled?: boolean;
   userId: string;
   createdAt: Timestamp;
 }
 
 const getDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+function getCompletedDates(exercise: Exercise) {
+  const dates = exercise.completedDates ?? [];
+  return exercise.completedDate && !dates.includes(exercise.completedDate)
+    ? [...dates, exercise.completedDate]
+    : dates;
+}
+
+export function isExerciseScheduledOnDate(exercise: Exercise, date: string) {
+  if (exercise.selectedDate === date) return true;
+  if (!exercise.routineEnabled || !exercise.routineDays?.length) return false;
+  const [year, month, day] = date.split('-').map(Number);
+  return exercise.routineDays.includes(new Date(year, month - 1, day).getDay() as HabitDay);
+}
 
 export function useExercises() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -63,7 +82,12 @@ export function useExercises() {
       getPendingWrites(userId, 'exercises'),
     ]).then(([cachedExercises, pendingWrites]) => {
       if (!active || receivedServerSnapshot) return;
-      setExercises(applyPendingWrites(cachedExercises, pendingWrites));
+      setExercises(applyPendingWrites(cachedExercises, pendingWrites).map((exercise) => ({
+        ...exercise,
+        completedDates: getCompletedDates(exercise),
+        routineDays: exercise.routineDays ?? [],
+        routineEnabled: exercise.routineEnabled ?? false,
+      })));
       setLoadedUserId(userId);
     }).catch((reason: unknown) => {
       if (active) {
@@ -83,12 +107,18 @@ export function useExercises() {
           ...exercise.data(),
           id: exercise.id,
         })) as Exercise[];
+        const normalizedExercises = remoteExercises.map((exercise) => ({
+          ...exercise,
+          completedDates: getCompletedDates(exercise),
+          routineDays: exercise.routineDays ?? [],
+          routineEnabled: exercise.routineEnabled ?? false,
+        }));
         void Promise.all([
-          saveCachedDocuments(userId, 'exercises', remoteExercises),
+          saveCachedDocuments(userId, 'exercises', normalizedExercises),
           getPendingWrites(userId, 'exercises'),
         ]).then(([, pendingWrites]) => {
           if (!active) return;
-          setExercises(applyPendingWrites(remoteExercises, pendingWrites));
+          setExercises(applyPendingWrites(normalizedExercises, pendingWrites));
           setLoadedUserId(userId);
           setError(null);
         }).catch((reason: unknown) => {
@@ -131,14 +161,25 @@ export function useExercises() {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier votre routine.');
     const existing = exercises.find((exercise) => exercise.name === name);
     if (existing) {
+      const selectedToday = isExerciseScheduledOnDate(existing, today);
+      const day = new Date(`${today}T00:00:00`).getDay() as HabitDay;
+      const routineDays = existing.routineDays ?? [];
+      const nextRoutineDays = selectedToday && existing.routineEnabled
+        ? routineDays.filter((routineDay) => routineDay !== day)
+        : routineDays;
       const write = await queueOfflineWrite({
         collectionKey: 'exercises',
         documentId: existing.id,
         path: `exercises/${existing.id}`,
         kind: 'update',
         data: {
-        selectedDate: existing.selectedDate === today ? null : today,
-        ...(existing.selectedDate === today ? { completedDate: null } : {}),
+          selectedDate: selectedToday ? null : today,
+          ...(selectedToday && existing.routineEnabled
+            ? {
+              routineDays: nextRoutineDays,
+              routineEnabled: nextRoutineDays.length > 0,
+            }
+            : {}),
         },
       }, userId);
       setExercises((current) => applyPendingWrites(current, [write]));
@@ -153,22 +194,33 @@ export function useExercises() {
       note: '',
       selectedDate: today,
       completedDate: null,
+      completedDates: [],
+      routineDays: [],
+      routineEnabled: false,
     });
   };
 
   const toggleCompleted = async (exerciseId: string) => {
     if (!db || !userId) throw new Error('Connectez-vous pour suivre votre routine.');
     const exercise = exercises.find((item) => item.id === exerciseId);
-    if (!exercise || exercise.selectedDate !== today) {
+    if (!exercise || !isExerciseScheduledOnDate(exercise, today)) {
       throw new Error('Cet exercice ne fait pas partie de votre routine du jour.');
     }
 
+    const completedDates = getCompletedDates(exercise);
+    const isCompleted = completedDates.includes(today);
+    const nextCompletedDates = isCompleted
+      ? completedDates.filter((date) => date !== today)
+      : [...completedDates, today];
     const write = await queueOfflineWrite({
       collectionKey: 'exercises',
       documentId: exerciseId,
       path: `exercises/${exerciseId}`,
       kind: 'update',
-      data: { completedDate: exercise.completedDate === today ? null : today },
+      data: {
+        completedDate: isCompleted ? null : today,
+        completedDates: nextCompletedDates,
+      },
     }, userId);
     setExercises((current) => applyPendingWrites(current, [write]));
   };
@@ -179,7 +231,8 @@ export function useExercises() {
     intensity: string,
     equipment: string,
     note: string,
-    addToToday: boolean
+    addToToday: boolean,
+    routineDays: HabitDay[] = ALL_HABIT_DAYS
   ) => {
     await saveExercise({
       name,
@@ -189,7 +242,57 @@ export function useExercises() {
       note: note.trim(),
       selectedDate: addToToday ? today : null,
       completedDate: null,
+      completedDates: [],
+      routineDays: [...new Set(routineDays)],
+      routineEnabled: addToToday,
     });
+  };
+
+  const updateCustomExercise = async (
+    exerciseId: string,
+    name: string,
+    duration: number,
+    intensity: string,
+    equipment: string,
+    note: string,
+    routineDays: HabitDay[],
+    routineEnabled: boolean
+  ) => {
+    if (!db || !userId) throw new Error('Connectez-vous pour modifier un exercice.');
+    const exercise = exercises.find((item) => item.id === exerciseId);
+    if (!exercise || exercise.userId !== userId) {
+      throw new Error('Cet exercice est introuvable sur cet appareil.');
+    }
+
+    const trimmedName = name.trim();
+    const trimmedEquipment = equipment.trim() || 'Sans matériel';
+    const trimmedNote = note.trim();
+    if (!trimmedName) throw new Error('Le nom de l’exercice ne peut pas être vide.');
+    if (!Number.isInteger(duration) || duration < 1 || duration > 180) {
+      throw new Error('Choisis une durée entre 1 et 180 minutes.');
+    }
+    if (routineEnabled && !routineDays.length) {
+      throw new Error('Choisis au moins un jour pour ta routine.');
+    }
+
+    const updatedExercise = {
+      name: trimmedName,
+      duration,
+      intensity,
+      equipment: trimmedEquipment,
+      note: trimmedNote,
+      routineDays: routineEnabled ? [...new Set(routineDays)] : [],
+      routineEnabled,
+      selectedDate: routineEnabled ? exercise.selectedDate : null,
+    };
+    const write = await queueOfflineWrite({
+      collectionKey: 'exercises',
+      documentId: exerciseId,
+      path: `exercises/${exerciseId}`,
+      kind: 'update',
+      data: updatedExercise,
+    }, userId);
+    setExercises((current) => applyPendingWrites(current, [write]));
   };
 
   return {
@@ -200,5 +303,6 @@ export function useExercises() {
     toggleToday,
     toggleCompleted,
     addCustomExercise,
+    updateCustomExercise,
   };
 }

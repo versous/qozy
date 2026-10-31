@@ -2,10 +2,12 @@ import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAudioPlaylist, useAudioPlaylistStatus } from 'expo-audio';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useTimer } from '@/hooks/useTimer';
+import { usePremium } from '@/services/PremiumProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -17,11 +19,17 @@ export default function BreathingScreen() {
   const { activity: requestedActivity, minutes: requestedMinutes } =
     useLocalSearchParams<{ activity?: string; minutes?: string }>();
   const activity = requestedActivity ?? 'Revenir à soi';
+  const { isPremium } = usePremium();
   const parsedMinutes = Number(requestedMinutes);
   const duration = Number.isInteger(parsedMinutes) && parsedMinutes > 0 && parsedMinutes <= 30
     ? parsedMinutes
     : 5;
   const { secondsLeft, isActive, startTimer, pauseTimer, resetTimer } = useTimer(duration);
+  const audioPlayer = useAudioPlaylist({
+    sources: [require('@/assets/audio/meditation-ambience.wav')],
+    loop: 'single',
+  });
+  const audioStatus = useAudioPlaylistStatus(audioPlayer);
   const elapsed = duration * 60 - secondsLeft;
   const phaseIndex = Math.floor(elapsed / 4) % phases.length;
   const phaseSecond = secondsLeft === 0 ? 0 : 4 - (elapsed % 4);
@@ -66,6 +74,29 @@ export default function BreathingScreen() {
         </View>
 
         <Text style={styles.encouragement}>Votre petite parenthèse de calme.</Text>
+        <View style={styles.musicCard}>
+          <View style={styles.musicCopy}>
+            <Text style={styles.musicTitle}>Musique douce pour méditer</Text>
+            <Text style={styles.musicSubtitle}>Une ambiance originale, à écouter en boucle.</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={audioStatus.playing ? 'Mettre la musique en pause' : 'Écouter la musique de méditation'}
+            onPress={() => {
+              if (!isPremium) {
+                router.push('/premium');
+              } else if (audioStatus.playing) {
+                audioPlayer.pause();
+              } else {
+                audioPlayer.play();
+              }
+            }}
+            style={styles.musicButton}>
+            <Text style={styles.musicButtonText}>
+              {isPremium ? (audioStatus.playing ? 'Ⅱ  Pause' : '▷  Écouter') : '✦  Premium'}
+            </Text>
+          </Pressable>
+        </View>
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>À écouter, à votre rythme</Text>
           <Text style={styles.seeAll}>Tout voir</Text>
@@ -139,6 +170,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 2, backgroundColor: palette.sage },
   cycleLabel: { position: 'absolute', bottom: 11, color: palette.sage, fontSize: 8, fontWeight: '600' },
   encouragement: { color: palette.textSecondary, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
+  musicCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.peachLight, marginBottom: spacing.md },
+  musicCopy: { flex: 1, gap: 4 },
+  musicTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
+  musicSubtitle: { color: palette.textSecondary, fontSize: 9, lineHeight: 14 },
+  musicButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
+  musicButtonText: { color: palette.surface, fontSize: 9, fontWeight: '700' },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
   seeAll: { color: palette.sage, fontSize: 10, fontWeight: '600' },

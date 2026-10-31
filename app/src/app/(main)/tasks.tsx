@@ -19,7 +19,7 @@ import { DatePickerField } from '@/components/DatePickerField';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
-import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
+import { ALL_HABIT_DAYS, type Habit, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { TaskPriority, TodoTask, useTasks } from '@/hooks/useTasks';
 import { spacing, borderRadius, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -47,7 +47,7 @@ const isValidDate = (value: string) => {
 export default function TasksScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const { habits, loading, error, addHabit, toggleHabit, updateHabitProgress } = useHabits();
+  const { habits, allHabits, loading, error, addHabit, updateHabit, toggleHabit, updateHabitProgress } = useHabits();
   const {
     tasks,
     loading: tasksLoading,
@@ -58,6 +58,7 @@ export default function TasksScreen() {
   } = useTasks();
   const [filter, setFilter] = useState<Filter>('active');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [title, setTitle] = useState('');
   const [habitDays, setHabitDays] = useState<HabitDay[]>(ALL_HABIT_DAYS);
   const [habitGoalType, setHabitGoalType] = useState<HabitGoalType>('check');
@@ -76,6 +77,7 @@ export default function TasksScreen() {
   const pending = habits.filter((habit) => !habit.isCompleted);
   const completed = habits.filter((habit) => habit.isCompleted);
   const visibleHabits = filter === 'active' ? pending : filter === 'done' ? completed : habits;
+  const otherHabits = allHabits.filter((habit) => !habits.some((todayHabit) => todayHabit.id === habit.id));
   const pendingTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
 
@@ -87,6 +89,17 @@ export default function TasksScreen() {
     setTaskPriority(task?.priority ?? 'normal');
     setTaskError('');
     setIsTaskModalVisible(true);
+  };
+
+  const openHabitModal = (habit?: Habit) => {
+    setEditingHabit(habit ?? null);
+    setTitle(habit?.title ?? '');
+    setHabitDays(habit?.frequencyDays ?? ALL_HABIT_DAYS);
+    setHabitGoalType(habit?.goalType ?? 'check');
+    setHabitGoalTarget(String(habit?.goalTarget ?? 20));
+    setHabitGoalUnit(habit?.goalUnit ?? 'pages');
+    setSaveError('');
+    setIsAdding(true);
   };
 
   const handleSaveTask = async () => {
@@ -136,16 +149,22 @@ export default function TasksScreen() {
     setSaveError('');
     try {
       const target = Number(habitGoalTarget);
-      await addHabit(title, '🌱', habitDays, {
+      const goal = {
         type: habitGoalType,
         target: habitGoalType === 'check' ? 1 : target,
         unit: habitGoalUnit,
-      });
+      };
+      if (editingHabit) {
+        await updateHabit(editingHabit.id, title, habitDays, goal);
+      } else {
+        await addHabit(title, '🌱', habitDays, goal);
+      }
       setTitle('');
       setHabitDays(ALL_HABIT_DAYS);
       setHabitGoalType('check');
       setHabitGoalTarget('20');
       setHabitGoalUnit('pages');
+      setEditingHabit(null);
       setIsAdding(false);
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter ce petit pas.");
@@ -304,47 +323,64 @@ export default function TasksScreen() {
           <ActivityIndicator color={colors.sage} style={styles.loader} />
         ) : visibleHabits.length ? (
           <View style={styles.taskList}>
-            {visibleHabits.map((habit) => habit.goalType === 'check' ? (
-              <Pressable
-                key={habit.id}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: habit.isCompleted }}
-                onPress={() => {
-                  void toggleHabit(habit.id).catch((reason) =>
-                    Alert.alert(
-                      'Modification impossible',
-                      reason instanceof Error ? reason.message : 'Réessaie plus tard.'
-                    )
-                  );
-                }}
-                style={styles.taskRow}>
-                <View style={[styles.checkbox, habit.isCompleted && styles.checkboxDone]}>
-                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
-                </View>
+            {visibleHabits.map((habit) => (
+              <View key={habit.id} style={[styles.taskRow, habit.goalType !== 'check' && styles.quantifiedRow]}>
+                {habit.goalType === 'check' ? (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: habit.isCompleted }}
+                    accessibilityLabel={`Valider ${habit.title}`}
+                    onPress={() => {
+                      void toggleHabit(habit.id).catch((reason) =>
+                        Alert.alert(
+                          'Modification impossible',
+                          reason instanceof Error ? reason.message : 'Réessaie plus tard.'
+                        )
+                      );
+                    }}>
+                    <View style={[styles.checkbox, habit.isCompleted && styles.checkboxDone]}>
+                      {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={[styles.checkbox, habit.isCompleted && styles.checkboxDone]}>
+                    {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                  </View>
+                )}
                 <View style={styles.taskCopy}>
                   <Text style={[styles.taskTitle, habit.isCompleted && styles.taskTitleDone]}>
                     {habit.title}
                   </Text>
-                  <Text style={styles.taskMeta}>
-                    {habit.isCompleted ? 'C’est fait, bravo.' : 'Un petit pas, à ton rythme'}
-                  </Text>
+                  {habit.goalType === 'check' ? (
+                    <Text style={styles.taskMeta}>
+                      {habit.isCompleted ? 'C’est fait, bravo.' : 'Un petit pas, à ton rythme'}
+                    </Text>
+                  ) : (
+                    <HabitProgressControl
+                      habit={habit}
+                      onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
+                    />
+                  )}
                 </View>
-                <Text style={styles.taskArrow}>›</Text>
-              </Pressable>
-            ) : (
-              <View key={habit.id} style={[styles.taskRow, styles.quantifiedRow]}>
-                <View style={[styles.checkbox, habit.isCompleted && styles.checkboxDone]}>
-                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
-                </View>
-                <View style={styles.taskCopy}>
-                  <Text style={[styles.taskTitle, habit.isCompleted && styles.taskTitleDone]}>
-                    {habit.title}
-                  </Text>
-                  <HabitProgressControl
-                    habit={habit}
-                    onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
-                  />
-                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ouvrir le calendrier Premium de ${habit.title}`}
+                  onPress={() => router.push({
+                    pathname: '/routine-calendar',
+                    params: { kind: 'habit', id: habit.id, title: habit.title },
+                  } as Href)}
+                  hitSlop={8}
+                  style={styles.habitCalendarButton}>
+                  <Text style={styles.habitCalendarText}>▦</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Modifier ${habit.title}`}
+                  onPress={() => openHabitModal(habit)}
+                  hitSlop={8}
+                  style={styles.habitEditButton}>
+                  <Text style={styles.todoAction}>✎</Text>
+                </Pressable>
               </View>
             ))}
           </View>
@@ -360,6 +396,48 @@ export default function TasksScreen() {
             </Text>
           </View>
         )}
+        {otherHabits.length ? (
+          <>
+            <View style={styles.sectionHeadingDone}>
+              <Text style={styles.sectionTitle}>Mes autres routines</Text>
+              <Text style={styles.sectionCount}>{otherHabits.length}</Text>
+            </View>
+            <View style={styles.taskList}>
+              {otherHabits.map((habit) => (
+                <View key={habit.id} style={styles.taskRow}>
+                  <Text style={styles.routineIcon}>{habit.icon}</Text>
+                  <View style={styles.taskCopy}>
+                    <Text style={styles.taskTitle}>{habit.title}</Text>
+                    <Text style={styles.taskMeta}>
+                      {habit.frequencyDays
+                        .map((day) => ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][day])
+                        .join(' · ')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ouvrir le calendrier Premium de ${habit.title}`}
+                    onPress={() => router.push({
+                      pathname: '/routine-calendar',
+                      params: { kind: 'habit', id: habit.id, title: habit.title },
+                    } as Href)}
+                    hitSlop={8}
+                    style={styles.habitCalendarButton}>
+                    <Text style={styles.habitCalendarText}>▦</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Modifier ${habit.title}`}
+                    onPress={() => openHabitModal(habit)}
+                    hitSlop={8}
+                    style={styles.habitEditButton}>
+                    <Text style={styles.todoAction}>✎</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.sectionHeadingDone}>
           <Text style={styles.sectionTitle}>Bouger en douceur</Text>
@@ -378,7 +456,7 @@ export default function TasksScreen() {
 
         <CosyButton
           title="+  Ajouter un petit pas"
-          onPress={() => setIsAdding(true)}
+          onPress={() => openHabitModal()}
           style={styles.addButton}
         />
       </ScrollView>
@@ -390,7 +468,7 @@ export default function TasksScreen() {
           <View style={styles.modal}>
             <View style={styles.handle} />
             <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
-            <Text style={styles.modalTitle}>Un petit pas</Text>
+            <Text style={styles.modalTitle}>{editingHabit ? 'Modifier mon habitude' : 'Un petit pas'}</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -406,6 +484,7 @@ export default function TasksScreen() {
               target={habitGoalTarget}
               unit={habitGoalUnit}
               disabled={saving}
+              typeLocked={Boolean(editingHabit)}
               onTypeChange={setHabitGoalType}
               onTargetChange={setHabitGoalTarget}
               onUnitChange={setHabitGoalUnit}
@@ -413,7 +492,7 @@ export default function TasksScreen() {
             <WeekdaySelector selectedDays={habitDays} onChange={setHabitDays} disabled={saving} />
             {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
             <CosyButton
-              title={saving ? 'Ajout en cours…' : 'Ajouter à ma journée'}
+              title={saving ? 'Enregistrement…' : editingHabit ? 'Enregistrer' : 'Ajouter à ma journée'}
               onPress={() => void saveHabit()}
               disabled={saving || !title.trim() || !habitDays.length || (
                 habitGoalType !== 'check'
@@ -538,6 +617,10 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   priorityImportant: { color: palette.clay, backgroundColor: palette.peachLight },
   dueDate: { color: palette.textSecondary, fontSize: 8 },
   todoActions: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  habitEditButton: { alignSelf: 'center', paddingLeft: spacing.xs },
+  habitCalendarButton: { alignSelf: 'center', paddingLeft: spacing.xs },
+  habitCalendarText: { color: palette.sage, fontSize: 15 },
+  routineIcon: { fontSize: 18, width: 25, textAlign: 'center' },
   todoAction: { color: palette.sage, fontSize: 17 },
   todoDelete: { color: palette.textSecondary, fontSize: 20, lineHeight: 20 },
   completedSummary: { color: palette.textSecondary, fontSize: 9, textAlign: 'center', paddingVertical: spacing.sm },

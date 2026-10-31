@@ -88,7 +88,11 @@ export function useTimeTracking() {
     let receivedServerSnapshot = false;
     const restoreActiveTimer = async () => {
       const rawTimer = await AsyncStorage.getItem(activeSessionKey(userId));
-      if (!active || !rawTimer) return;
+      if (!active) return;
+      if (!rawTimer) {
+        setActiveSession(null);
+        return;
+      }
       const savedTimer: unknown = JSON.parse(rawTimer);
       if (!savedTimer || typeof savedTimer !== 'object') {
         throw new Error('Le chronomètre enregistré est illisible.');
@@ -263,7 +267,7 @@ export function useTimeTracking() {
 
   return {
     entries: userId && loadedUserId === userId ? entries : [],
-    activeSession: userId ? activeSession : null,
+    activeSession: userId && timerLoadedUserId === userId ? activeSession : null,
     timerLoaded: !userId || timerLoadedUserId === userId,
     elapsedSeconds: activeSession
       ? Math.max(0, Math.floor((now - activeSession.startedAtMs) / 1000))

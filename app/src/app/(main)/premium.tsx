@@ -282,6 +282,28 @@ export default function PremiumScreen() {
                 </>
               )}
             </View>
+            <View style={styles.featureLinks}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/weekly-review')}
+                style={styles.featureLink}>
+                <View style={styles.featureLinkCopy}>
+                  <Text style={styles.featureLinkTitle}>Bilan hebdomadaire</Text>
+                  <Text style={styles.featureLinkSubtitle}>Voir mon cercle de progression du mois</Text>
+                </View>
+                <Text style={styles.featureLinkArrow}>›</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/activity-calendar')}
+                style={styles.featureLink}>
+                <View style={styles.featureLinkCopy}>
+                  <Text style={styles.featureLinkTitle}>Calendrier de mes activités</Text>
+                  <Text style={styles.featureLinkSubtitle}>Un aperçu quotidien comme une heatmap</Text>
+                </View>
+                <Text style={styles.featureLinkArrow}>›</Text>
+              </Pressable>
+            </View>
             {habitsError || tasksError
               ? <Text style={styles.errorText}>{habitsError || tasksError}</Text>
               : null}
@@ -302,6 +324,9 @@ export default function PremiumScreen() {
             <View style={styles.benefitCard}>
               <FeatureRow title="Bilan hebdomadaire" detail="Retrouve les petits pas accomplis cette semaine." styles={styles} />
               <FeatureRow title="Progression du mois" detail="Visualise tes habitudes et tes tâches au fil des jours." styles={styles} />
+              <FeatureRow title="Calendrier de chaque activité" detail="Repère tes jours actifs dans une vue annuelle." styles={styles} />
+              <FeatureRow title="Musique de méditation" detail="Une ambiance douce pour accompagner ta pause." styles={styles} />
+              <FeatureRow title="Historique d’hydratation" detail="Retrouve tes volumes d’eau enregistrés au fil des jours." styles={styles} />
               <FeatureRow title="Objectifs du mois" detail="Choisis un cap doux et suis ta progression." styles={styles} />
             </View>
 
@@ -507,6 +532,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   featureCopy: { flex: 1, gap: 3 },
   featureTitle: { color: palette.textPrimary, fontSize: 12, fontWeight: '700' },
   featureDetail: { color: palette.textSecondary, fontSize: 10, lineHeight: 15 },
+  featureLinks: { gap: spacing.sm, marginTop: spacing.md },
+  featureLink: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  featureLinkCopy: { flex: 1, gap: 3 },
+  featureLinkTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
+  featureLinkSubtitle: { color: palette.textSecondary, fontSize: 9 },
+  featureLinkArrow: { color: palette.sage, fontSize: 22 },
   planHeading: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600', marginTop: spacing.lg, marginBottom: spacing.sm },
   planCard: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.sm },
   annualCard: { borderColor: palette.sage },

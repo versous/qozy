@@ -30,11 +30,21 @@ export interface TodoTask {
   startTime?: string | null;
   durationMinutes?: number | null;
   completed: boolean;
+  completedDate?: string | null;
+  completedDates?: string[];
   userId: string;
   createdAt: Timestamp;
 }
 
 type TaskInput = Pick<TodoTask, 'title' | 'description' | 'priority' | 'dueDate'>;
+
+function normalizeTask(task: TodoTask): TodoTask {
+  return {
+    ...task,
+    completedDate: task.completedDate ?? null,
+    completedDates: Array.isArray(task.completedDates) ? task.completedDates : [],
+  };
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState<TodoTask[]>([]);
@@ -54,7 +64,10 @@ export function useTasks() {
         getPendingWrites(userId, 'tasks'),
       ]);
       if (!active || receivedServerSnapshot) return;
-      setTasks(sortTasks(applyPendingWrites(cachedTasks, pendingWrites)));
+      setTasks(sortTasks(applyPendingWrites(
+        cachedTasks.map(normalizeTask),
+        pendingWrites
+      )));
       setLoadedUserId(userId);
     };
 
@@ -72,10 +85,10 @@ export function useTasks() {
       { includeMetadataChanges: true },
       (snapshot) => {
         if (!snapshot.metadata.fromCache) receivedServerSnapshot = true;
-        const remoteTasks = snapshot.docs.map((task) => ({
+        const remoteTasks = snapshot.docs.map((task) => normalizeTask({
           ...task.data(),
           id: task.id,
-        })) as TodoTask[];
+        } as TodoTask));
         void Promise.all([
           saveCachedDocuments(userId, 'tasks', remoteTasks),
           getPendingWrites(userId, 'tasks'),
@@ -135,7 +148,13 @@ export function useTasks() {
       kind: taskId ? 'update' : 'set',
       data: taskId
         ? taskData
-        : { ...taskData, completed: false, createdAt: Timestamp.now() },
+        : {
+          ...taskData,
+          completed: false,
+          completedDate: null,
+          completedDates: [],
+          createdAt: Timestamp.now(),
+        },
     }, userId);
 
     setTasks((currentTasks) => sortTasks(applyPendingWrites(
@@ -149,12 +168,22 @@ export function useTasks() {
     if (!tasks.some((currentTask) => currentTask.id === task.id)) {
       throw new Error('Cette tâche est introuvable sur cet appareil.');
     }
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const completedDates = task.completedDates ?? [];
+    const nextCompletedDates = task.completed
+      ? completedDates.filter((date) => date !== task.completedDate)
+      : [...new Set([...completedDates, todayKey])];
     const write = await queueOfflineWrite({
       collectionKey: 'tasks',
       documentId: task.id,
       path: `tasks/${task.id}`,
       kind: 'update',
-      data: { completed: !task.completed },
+      data: {
+        completed: !task.completed,
+        completedDate: task.completed ? null : todayKey,
+        completedDates: nextCompletedDates,
+      },
     }, userId);
     setTasks((currentTasks) => sortTasks(applyPendingWrites(currentTasks, [write])));
   };

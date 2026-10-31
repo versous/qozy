@@ -56,7 +56,7 @@ export default function RemindersScreen() {
     try {
       const updated = await saveTimeReminder(reminders, { ...reminders.time, enabled });
       setReminders(updated);
-      setNotice(enabled ? 'Ton rappel quotidien est activé.' : 'Ton rappel quotidien est désactivé.');
+      setNotice(enabled ? 'Ton rappel quotidien est enregistré.' : 'Ton rappel quotidien est désactivé.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Le rappel horaire n’a pas pu être enregistré.');
     } finally {
@@ -74,7 +74,9 @@ export default function RemindersScreen() {
         message: reminders.location.message,
       });
       setReminders(updated);
-      setNotice(enabled ? 'Ton rappel se déclenchera à ton arrivée près de cet endroit.' : 'Ton rappel de localisation est désactivé.');
+      setNotice(enabled
+        ? 'Ton rappel se déclenchera à ton arrivée près de cet endroit.'
+        : 'Ton rappel de localisation est désactivé.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Le rappel de localisation n’a pas pu être enregistré.');
     } finally {
@@ -154,6 +156,15 @@ export default function RemindersScreen() {
               </Text>
             )}
           </Pressable>
+          {reminders.time.enabled ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={savingTime}
+              onPress={() => void saveTime(true)}
+              style={[styles.saveChanges, savingTime && styles.disabled]}>
+              <Text style={styles.saveChangesText}>Enregistrer les modifications</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -191,6 +202,15 @@ export default function RemindersScreen() {
               </Text>
             )}
           </Pressable>
+          {reminders.location.enabled ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={savingLocation}
+              onPress={() => void saveLocation(true)}
+              style={[styles.saveChanges, savingLocation && styles.disabled]}>
+              <Text style={styles.saveChangesText}>Enregistrer les modifications</Text>
+            </Pressable>
+          ) : null}
           {reminders.location.enabled ? (
             <Text style={styles.hint}>Rappel à l’entrée dans une zone d’environ 150 m autour du lieu enregistré.</Text>
           ) : null}
@@ -230,6 +250,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   actionActive: { backgroundColor: palette.sage },
   actionText: { color: palette.sage, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   actionTextActive: { color: palette.surface },
+  saveChanges: { minHeight: 40, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs, borderRadius: borderRadius.extraLarge, borderWidth: 1, borderColor: palette.border },
+  saveChangesText: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
   disabled: { opacity: 0.6 },
   error: { color: palette.error, fontSize: 11, lineHeight: 16, marginTop: spacing.md },
   notice: { color: palette.sage, fontSize: 11, lineHeight: 16, marginTop: spacing.md },

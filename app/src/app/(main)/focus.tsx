@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAudioPlaylist, useAudioPlaylistStatus } from 'expo-audio';
 
 import { useTimer } from '@/hooks/useTimer';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
@@ -31,9 +32,20 @@ function FocusSession({ activity, duration }: { activity: string; duration: numb
     duration,
     () => Alert.alert('Belle séance', 'Tu as pris ce temps pour toi. Bravo.')
   );
+  const audioPlayer = useAudioPlaylist({
+    sources: [require('@/assets/audio/meditation-ambience.wav')],
+    loop: 'single',
+  });
+  const audioStatus = useAudioPlaylistStatus(audioPlayer);
+
+  useEffect(() => {
+    audioPlayer.play();
+    return () => audioPlayer.pause();
+  }, [audioPlayer]);
 
   const leaveSession = () => {
     pauseTimer();
+    audioPlayer.pause();
     router.back();
   };
 
@@ -77,6 +89,15 @@ function FocusSession({ activity, duration }: { activity: string; duration: numb
               <Text style={styles.secondaryButtonText}>Recommencer</Text>
             </Pressable>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={audioStatus.playing ? 'Mettre l’ambiance en pause' : 'Reprendre l’ambiance sonore'}
+            onPress={() => audioStatus.playing ? audioPlayer.pause() : audioPlayer.play()}
+            style={styles.musicButton}>
+            <Text style={styles.musicButtonText}>
+              {audioStatus.playing ? '♫  Ambiance activée · Pause' : '♫  Reprendre l’ambiance'}
+            </Text>
+          </Pressable>
         </View>
 
         <Text style={styles.footer}>Une chose à la fois. Tu es exactement là où il faut.</Text>
@@ -102,6 +123,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   primaryButtonText: { color: palette.surface, fontSize: 11, fontWeight: '700' },
   secondaryButton: { alignItems: 'center', paddingTop: spacing.sm },
   secondaryButtonText: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
+  musicButton: { alignSelf: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginTop: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  musicButtonText: { color: palette.sage, fontSize: 9, fontWeight: '600' },
   footer: { color: palette.surface, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 5, marginBottom: spacing.sm },
   pressed: { opacity: 0.82 },
   disabled: { opacity: 0.7 },

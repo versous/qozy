@@ -10,11 +10,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
-import { Exercise, useExercises } from '@/hooks/useExercises';
+import { Exercise, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
+import { type HabitDay } from '@/hooks/useHabits';
+import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -36,7 +38,7 @@ export default function ExerciseScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
   const { mode: requestedMode } = useLocalSearchParams<{ mode?: string }>();
-  const { exercises, today, loading, error, toggleToday, addCustomExercise } = useExercises();
+  const { exercises, today, loading, error, toggleToday, addCustomExercise, updateCustomExercise } = useExercises();
   const [mode, setMode] = useState<'library' | 'create'>(requestedMode === 'create' ? 'create' : 'library');
   const [filter, setFilter] = useState<Filter>('Tous');
   const [search, setSearch] = useState('');
@@ -48,6 +50,8 @@ export default function ExerciseScreen() {
   const [equipment, setEquipment] = useState('Sans matériel');
   const [note, setNote] = useState('');
   const [addNewToToday, setAddNewToToday] = useState(true);
+  const [routineDays, setRoutineDays] = useState<HabitDay[]>([1, 2, 3, 4, 5]);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
 
   const customExercises = exercises.filter(
     (exercise) => !catalog.some((item) => item.name === exercise.name)
@@ -73,7 +77,7 @@ export default function ExerciseScreen() {
       (filter === 'Sans matériel' && exercise.equipment === 'Sans matériel');
     return matchesSearch && matchesFilter;
   });
-  const selectedExercises = exercises.filter((exercise) => exercise.selectedDate === today);
+  const selectedExercises = exercises.filter((exercise) => isExerciseScheduledOnDate(exercise, today));
   const selectedDuration = selectedExercises.reduce((total, exercise) => total + exercise.duration, 0);
 
   const toggleExercise = async (exercise: Activity) => {
@@ -86,6 +90,32 @@ export default function ExerciseScreen() {
     } finally {
       setSavingName('');
     }
+  };
+
+  const openExerciseEditor = (exercise: Exercise) => {
+    setEditingExercise(exercise);
+    setName(exercise.name);
+    setDuration(String(exercise.duration));
+    setIntensity(exercise.intensity === 'Modérée' ? 'Modérée' : 'Douce');
+    setEquipment(exercise.equipment);
+    setNote(exercise.note);
+    setRoutineDays(exercise.routineDays?.length ? exercise.routineDays : [1, 2, 3, 4, 5]);
+    setAddNewToToday(Boolean(exercise.routineEnabled));
+    setSaveError('');
+    setMode('create');
+  };
+
+  const startNewExercise = () => {
+    setEditingExercise(null);
+    setName('');
+    setDuration('15');
+    setIntensity('Douce');
+    setEquipment('Sans matériel');
+    setNote('');
+    setAddNewToToday(true);
+    setRoutineDays([1, 2, 3, 4, 5]);
+    setSaveError('');
+    setMode('create');
   };
 
   const saveCustom = async () => {
@@ -102,9 +132,36 @@ export default function ExerciseScreen() {
     setSavingName('custom');
     setSaveError('');
     try {
-      await addCustomExercise(name, minutes, intensity, equipment.trim() || 'Sans matériel', note, addNewToToday);
+      if (editingExercise) {
+        await updateCustomExercise(
+          editingExercise.id,
+          name,
+          minutes,
+          intensity,
+          equipment,
+          note,
+          routineDays,
+          addNewToToday
+        );
+      } else {
+        await addCustomExercise(
+          name,
+          minutes,
+          intensity,
+          equipment.trim() || 'Sans matériel',
+          note,
+          addNewToToday,
+          routineDays
+        );
+      }
       setName('');
+      setDuration('15');
+      setIntensity('Douce');
+      setEquipment('Sans matériel');
       setNote('');
+      setAddNewToToday(true);
+      setRoutineDays([1, 2, 3, 4, 5]);
+      setEditingExercise(null);
       setMode('library');
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'enregistrer l'exercice.");
@@ -157,7 +214,7 @@ export default function ExerciseScreen() {
 
         <View style={styles.segment}>
           <Pressable
-            onPress={() => setMode('create')}
+            onPress={startNewExercise}
             style={[styles.segmentItem, mode === 'create' && styles.segmentSelected]}>
             <Text style={[styles.segmentText, mode === 'create' && styles.segmentTextSelected]}>Créer le mien</Text>
           </Pressable>
@@ -170,7 +227,7 @@ export default function ExerciseScreen() {
 
         {mode === 'create' ? (
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Un exercice à moi</Text>
+            <Text style={styles.formTitle}>{editingExercise ? 'Modifier mon exercice' : 'Un exercice à moi'}</Text>
             <Text style={styles.formSubtitle}>Tes envies, ton mouvement, ton rythme.</Text>
             <Text style={styles.label}>Nom de l’exercice *</Text>
             <TextInput value={name} onChangeText={setName} placeholder="Ma marche du soir" placeholderTextColor={colors.textLight} style={styles.input} maxLength={70} />
@@ -186,6 +243,19 @@ export default function ExerciseScreen() {
                 </Pressable>
               ))}
             </View>
+            <View style={styles.routineDaysHeading}>
+              <Text style={styles.label}>Quels jours ?</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setRoutineDays([1, 2, 3, 4, 5])}>
+                <Text style={styles.weekdaysPreset}>Du lundi au vendredi</Text>
+              </Pressable>
+            </View>
+            <WeekdaySelector
+              selectedDays={routineDays}
+              onChange={setRoutineDays}
+              disabled={savingName !== ''}
+            />
             <Text style={styles.label}>Matériel</Text>
             <TextInput value={equipment} onChangeText={setEquipment} placeholder="Sans matériel" placeholderTextColor={colors.textLight} style={styles.input} />
             <Text style={styles.label}>Mon petit repère <Text style={styles.optional}>(facultatif)</Text></Text>
@@ -200,7 +270,12 @@ export default function ExerciseScreen() {
               </View>
             </Pressable>
             {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
-            <CosyButton title={savingName === 'custom' ? 'Enregistrement…' : 'Enregistrer mon exercice'} onPress={() => void saveCustom()} disabled={savingName !== ''} style={styles.primaryButton} />
+            <CosyButton
+              title={savingName === 'custom' ? 'Enregistrement…' : editingExercise ? 'Enregistrer les changements' : 'Enregistrer mon exercice'}
+              onPress={() => void saveCustom()}
+              disabled={savingName !== ''}
+              style={styles.primaryButton}
+            />
             <Text style={styles.footnote}>* Champs essentiels · Tu pourras le modifier plus tard.</Text>
           </View>
         ) : (
@@ -225,24 +300,50 @@ export default function ExerciseScreen() {
             <Text style={styles.librarySubhead}>Pour bouger en douceur</Text>
             {filteredExercises.map((exercise) => {
               const saved = exercises.find((item) => item.name === exercise.name);
-              const selected = saved?.selectedDate === today;
+              const selected = saved ? isExerciseScheduledOnDate(saved, today) : false;
+              const isCustom = Boolean(saved && customExercises.some((item) => item.id === saved.id));
               return (
-                <Pressable
-                  key={exercise.name}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  disabled={savingName !== ''}
-                  onPress={() => void toggleExercise(exercise)}
-                  style={styles.exerciseCard}>
-                  <View style={styles.exerciseIcon}><Text style={styles.exerciseIconText}>✳</Text></View>
-                  <View style={styles.exerciseCopy}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                    <Text style={styles.exerciseMeta}>{exercise.duration} min · {exercise.intensity} · {exercise.equipment}</Text>
-                  </View>
-                  <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-                    {selected ? <Text style={styles.checkboxCheck}>✓</Text> : null}
-                  </View>
-                </Pressable>
+                <View key={exercise.name} style={styles.exerciseCard}>
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    disabled={savingName !== ''}
+                    onPress={() => void toggleExercise(exercise)}
+                    style={styles.exerciseSelectArea}>
+                    <View style={styles.exerciseIcon}><Text style={styles.exerciseIconText}>✳</Text></View>
+                    <View style={styles.exerciseCopy}>
+                      <Text style={styles.exerciseName}>{exercise.name}</Text>
+                      <Text style={styles.exerciseMeta}>{exercise.duration} min · {exercise.intensity} · {exercise.equipment}</Text>
+                    </View>
+                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                      {selected ? <Text style={styles.checkboxCheck}>✓</Text> : null}
+                    </View>
+                  </Pressable>
+                  {saved?.routineEnabled ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ouvrir le calendrier Premium de ${exercise.name}`}
+                      onPress={() => router.push({
+                        pathname: '/routine-calendar',
+                        params: { kind: 'exercise', id: saved.id, title: saved.name },
+                      } as Href)}
+                      hitSlop={8}
+                      style={styles.exerciseCalendar}>
+                      <Text style={styles.exerciseEditText}>▦</Text>
+                    </Pressable>
+                  ) : null}
+                  {isCustom ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Modifier ${exercise.name}`}
+                      disabled={savingName !== ''}
+                      onPress={() => saved && openExerciseEditor(saved)}
+                      hitSlop={8}
+                      style={styles.exerciseEdit}>
+                      <Text style={styles.exerciseEditText}>✎</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               );
             })}
             {!filteredExercises.length ? <Text style={styles.emptyText}>Aucun exercice ne correspond à ta recherche.</Text> : null}
@@ -298,6 +399,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   formTitle: { color: palette.textPrimary, fontSize: 19, fontFamily: 'serif', fontWeight: '600' },
   formSubtitle: { color: palette.textSecondary, fontSize: 10, marginTop: 3, marginBottom: spacing.md },
   label: { color: palette.textPrimary, fontSize: 10, fontWeight: '700', marginBottom: 5, marginTop: spacing.sm },
+  routineDaysHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  weekdaysPreset: { color: palette.sage, fontSize: 9, fontWeight: '600' },
   optional: { color: palette.textSecondary, fontWeight: '400' },
   input: { minHeight: 42, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border, color: palette.textPrimary, fontSize: 11 },
   durationInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
@@ -332,7 +435,11 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   filterTextSelected: { color: palette.surface },
   loader: { padding: spacing.sm },
   librarySubhead: { color: palette.textPrimary, fontSize: 13, fontFamily: 'serif', fontWeight: '600', marginBottom: spacing.xs },
-  exerciseCard: { minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  exerciseCard: { minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
+  exerciseSelectArea: { flex: 1, minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  exerciseEdit: { padding: spacing.xs },
+  exerciseCalendar: { padding: spacing.xs },
+  exerciseEditText: { color: palette.sage, fontSize: 17 },
   exerciseIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.sagePale },
   exerciseIconText: { color: palette.sage, fontSize: 17 },
   exerciseCopy: { flex: 1 },

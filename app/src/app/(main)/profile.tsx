@@ -169,6 +169,19 @@ export default function ProfileScreen() {
         </View>
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/music-library')}
+          style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
+          <View style={[styles.menuIcon, styles.menuIconSage]}>
+            <Text style={styles.menuIconText}>♫</Text>
+          </View>
+          <View style={styles.menuCopy}>
+            <Text style={styles.menuTitle}>Ma musique</Text>
+            <Text style={styles.menuSubtitle}>Choisir mes ambiances Lofi et méditation</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/tasks')}
           style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
           <View style={[styles.menuIcon, styles.menuIconSage]}>
@@ -200,10 +213,10 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.lg },
-  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 0.8, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 25, lineHeight: 32, fontFamily: 'serif', fontWeight: '600', marginTop: 5, marginBottom: spacing.md },
+  title: { color: palette.textPrimary, fontSize: 25, lineHeight: 32, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 5, marginBottom: spacing.md },
   profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.peach },
   avatarText: { color: palette.clay, fontSize: 18, fontWeight: '700' },
@@ -212,11 +225,11 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   email: { color: palette.textSecondary, fontSize: 11, marginTop: 4 },
   sparkle: { color: palette.sage, fontSize: 18 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionMeta: { color: palette.textSecondary, fontSize: 9 },
   statsCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
   stat: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 5 },
-  statValue: { color: palette.sage, fontSize: 23, fontFamily: 'serif', fontWeight: '700' },
+  statValue: { color: palette.sage, fontSize: 23, fontFamily: typography.fonts.display, fontWeight: '700' },
   statLabel: { color: palette.textSecondary, fontSize: 9 },
   statDivider: { width: 1, height: 38, backgroundColor: palette.border },
   error: { color: palette.error, fontSize: 11, marginTop: spacing.sm },
@@ -242,6 +255,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   menuSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
   menuArrow: { color: palette.sage, fontSize: 22 },
   signOutButton: { marginTop: spacing.lg, borderColor: palette.border, backgroundColor: palette.surface },
-  footer: { color: palette.textSecondary, fontSize: 10, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
+  footer: { color: palette.textSecondary, fontSize: 10, fontFamily: typography.fonts.display, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
   pressed: { opacity: 0.78 },
 });

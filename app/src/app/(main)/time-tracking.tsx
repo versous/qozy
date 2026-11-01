@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -340,19 +341,19 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: spacing.md },
   backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 26, lineHeight: 33, fontFamily: 'serif', fontWeight: '600', marginTop: 5 },
+  title: { color: palette.textPrimary, fontSize: 26, lineHeight: 33, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 5 },
   subtitle: { color: palette.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 5, marginBottom: spacing.md },
   timerCard: { alignItems: 'center', padding: spacing.lg, borderRadius: borderRadius.large, backgroundColor: palette.sagePale },
   liveIndicator: { width: 9, height: 9, borderRadius: 5, backgroundColor: palette.sage, marginBottom: spacing.xs },
   activeLabel: { color: palette.sage, fontSize: 8, letterSpacing: 1, fontWeight: '700' },
-  timer: { color: palette.textPrimary, fontSize: 42, fontVariant: ['tabular-nums'], fontFamily: 'serif', fontWeight: '600', marginVertical: spacing.xs },
+  timer: { color: palette.textPrimary, fontSize: 42, fontVariant: ['tabular-nums'], fontFamily: typography.fonts.display, fontWeight: '600', marginVertical: spacing.xs },
   activeDescription: { color: palette.textSecondary, fontSize: 11 },
   activeTask: { color: palette.textPrimary, fontSize: 10, fontWeight: '600', marginTop: 4 },
   stopButton: { width: '100%', minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage, marginTop: spacing.md },
   stopButtonText: { color: palette.surface, fontSize: 11, fontWeight: '700' },
   softNote: { color: palette.textSecondary, fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: spacing.sm },
   startCard: { padding: spacing.md, borderRadius: borderRadius.large, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-  cardTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  cardTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
   categoryChip: { paddingHorizontal: spacing.sm, paddingVertical: 8, borderRadius: borderRadius.extraLarge, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background },
   categoryChipSelected: { backgroundColor: palette.sage, borderColor: palette.sage },

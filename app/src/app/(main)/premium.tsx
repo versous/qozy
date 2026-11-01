@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -171,7 +172,7 @@ export default function PremiumScreen() {
             <View style={styles.previewCopy}>
               <Text style={styles.previewTitle}>Aperçu développeur</Text>
               <Text style={styles.previewDetail}>
-                Active Premium pour tester les bilans et objectifs. Cela ne crée aucun achat.
+                Active Premium pour tester les bilans, objectifs et morceaux réservés. Cela ne crée aucun achat.
               </Text>
             </View>
             <Pressable
@@ -208,7 +209,7 @@ export default function PremiumScreen() {
                 colors={colors}
               />
               <MetricRow
-                label="Tâches du calendrier terminées"
+                label="Petits pas du calendrier"
                 value={`${weeklyTasks.completed} / ${weeklyTasks.planned}`}
                 percent={getPercent(weeklyTasks.completed, weeklyTasks.planned)}
                 styles={styles}
@@ -229,14 +230,14 @@ export default function PremiumScreen() {
                 colors={colors}
               />
               <MetricRow
-                label="Tâches planifiées terminées"
+                label="Petits pas prévus"
                 value={`${monthlyTasks.completed} / ${monthlyTasks.planned}`}
                 percent={getPercent(monthlyTasks.completed, monthlyTasks.planned)}
                 styles={styles}
                 colors={colors}
               />
               <Text style={styles.helperText}>
-                Les tâches sont comptées selon leur date prévue et leur état actuel.
+                Les petits pas sont comptés selon leur date prévue et leur état actuel.
               </Text>
             </View>
             <View style={styles.sectionHeading}>
@@ -259,7 +260,7 @@ export default function PremiumScreen() {
                     colors={colors}
                   />
                   <GoalControl
-                    title="Tâches terminées"
+                    title="Petits pas accomplis"
                     current={monthlyTasks.completed}
                     target={taskTarget}
                     onDecrease={() => changeTarget('task', -1)}
@@ -323,9 +324,10 @@ export default function PremiumScreen() {
           <>
             <View style={styles.benefitCard}>
               <FeatureRow title="Bilan hebdomadaire" detail="Retrouve les petits pas accomplis cette semaine." styles={styles} />
-              <FeatureRow title="Progression du mois" detail="Visualise tes habitudes et tes tâches au fil des jours." styles={styles} />
+              <FeatureRow title="Progression du mois" detail="Visualise tes habitudes et tes petits pas au fil des jours." styles={styles} />
               <FeatureRow title="Calendrier de chaque activité" detail="Repère tes jours actifs dans une vue annuelle." styles={styles} />
-              <FeatureRow title="Musique de méditation" detail="Une ambiance douce pour accompagner ta pause." styles={styles} />
+              <FeatureRow title="Petits moments personnalisés" detail="Crée et modifie tes propres activités, avec tes photos et leurs étapes." styles={styles} />
+              <FeatureRow title="Bibliothèque musicale étendue" detail="Débloque des titres Lofi et de méditation supplémentaires. Deux morceaux de chaque catégorie restent inclus en Standard." styles={styles} />
               <FeatureRow title="Historique d’hydratation" detail="Retrouve tes volumes d’eau enregistrés au fil des jours." styles={styles} />
               <FeatureRow title="Objectifs du mois" detail="Choisis un cap doux et suis ta progression." styles={styles} />
             </View>
@@ -499,10 +501,10 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: spacing.md },
   backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: 'serif', fontWeight: '600', marginTop: 6 },
+  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 6 },
   subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 7 },
   sectionHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionMeta: { color: palette.textSecondary, fontSize: 9 },
   reportCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, gap: spacing.md },
   cardEyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 1, fontWeight: '700' },
@@ -538,7 +540,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   featureLinkTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
   featureLinkSubtitle: { color: palette.textSecondary, fontSize: 9 },
   featureLinkArrow: { color: palette.sage, fontSize: 22 },
-  planHeading: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600', marginTop: spacing.lg, marginBottom: spacing.sm },
+  planHeading: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: spacing.lg, marginBottom: spacing.sm },
   planCard: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.sm },
   annualCard: { borderColor: palette.sage },
   planCopy: { flex: 1, minWidth: '50%' },

@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -188,7 +189,7 @@ export default function ExerciseScreen() {
 
         <View style={styles.hero}>
           <Image
-            source={require('@/assets/images/exercise-room.jpg')}
+            source={require('@/assets/images/exercise-session.jpg')}
             resizeMode="cover"
             style={styles.heroImage}
             accessibilityLabel="Un moment de mouvement doux dans une pièce lumineuse"
@@ -197,7 +198,7 @@ export default function ExerciseScreen() {
           <View style={styles.heroCopy}>
             <Text style={styles.heroTitle}>Un moment pour toi</Text>
             <Text style={styles.heroSubtitle}>On bouge ensemble, à ton rythme.</Text>
-            <Text style={styles.lofi}>♫  AMBIANCE LOFI</Text>
+            <Text style={styles.lofi}>⚡  MUSIQUE POUR BOUGER</Text>
           </View>
         </View>
 
@@ -369,18 +370,18 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.md },
-  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
   back: { alignSelf: 'flex-start', marginBottom: spacing.sm },
   backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 4 },
   subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
   hero: { height: 136, overflow: 'hidden', borderRadius: borderRadius.medium, marginBottom: spacing.sm, justifyContent: 'center' },
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(40, 43, 34, 0.17)' },
   heroCopy: { maxWidth: '62%', padding: spacing.md },
-  heroTitle: { color: '#FFFDF7', fontSize: 17, fontFamily: 'serif', fontWeight: '700' },
+  heroTitle: { color: '#FFFDF7', fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '700' },
   heroSubtitle: { color: '#FFFDF7', fontSize: 10, lineHeight: 15, marginTop: 4 },
   lofi: { color: '#FFFDF7', fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
   progressCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.sagePale },
@@ -396,7 +397,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   segmentText: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
   segmentTextSelected: { color: palette.surface },
   formCard: { padding: spacing.md, backgroundColor: palette.surface, borderRadius: borderRadius.medium, borderWidth: 1, borderColor: palette.border },
-  formTitle: { color: palette.textPrimary, fontSize: 19, fontFamily: 'serif', fontWeight: '600' },
+  formTitle: { color: palette.textPrimary, fontSize: 19, fontFamily: typography.fonts.display, fontWeight: '600' },
   formSubtitle: { color: palette.textSecondary, fontSize: 10, marginTop: 3, marginBottom: spacing.md },
   label: { color: palette.textPrimary, fontSize: 10, fontWeight: '700', marginBottom: 5, marginTop: spacing.sm },
   routineDaysHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
@@ -424,7 +425,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   footnote: { color: palette.textSecondary, fontSize: 8, textAlign: 'center', marginTop: spacing.sm },
   library: { paddingBottom: spacing.md },
   libraryHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionSubtitle: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
   muted: { color: palette.textSecondary, fontSize: 9 },
   searchInput: { height: 42, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, color: palette.textPrimary, fontSize: 11 },
@@ -434,7 +435,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   filterText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600' },
   filterTextSelected: { color: palette.surface },
   loader: { padding: spacing.sm },
-  librarySubhead: { color: palette.textPrimary, fontSize: 13, fontFamily: 'serif', fontWeight: '600', marginBottom: spacing.xs },
+  librarySubhead: { color: palette.textPrimary, fontSize: 13, fontFamily: typography.fonts.display, fontWeight: '600', marginBottom: spacing.xs },
   exerciseCard: { minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
   exerciseSelectArea: { flex: 1, minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   exerciseEdit: { padding: spacing.xs },

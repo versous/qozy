@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,8 +28,8 @@ export default function PrepareScreen() {
 
   const startSession = () =>
     router.push({
-      pathname: '/focus',
-      params: { activity, minutes: String(duration) },
+      pathname: '/activity-ready',
+      params: { activity, minutes: String(duration), category: 'lofi' },
     });
 
   return (
@@ -71,7 +72,7 @@ export default function PrepareScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mes tâches</Text>
+          <Text style={styles.sectionTitle}>Mes activités</Text>
           <Text style={styles.muted}>3 activités</Text>
         </View>
         {activities.map((item) => {
@@ -158,7 +159,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginBottom: spacing.sm },
   backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 5 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600' },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600' },
   subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: spacing.md },
   segment: { flexDirection: 'row', backgroundColor: palette.sageLight, borderRadius: borderRadius.extraLarge, padding: 3, marginBottom: spacing.md },
   segmentActive: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sage, borderRadius: borderRadius.extraLarge, paddingVertical: 9 },
@@ -169,11 +170,11 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   featureArt: { width: 76, minHeight: 80, borderRadius: borderRadius.small, backgroundColor: palette.peachLight, alignItems: 'center', justifyContent: 'center' },
   featureArtText: { color: palette.clay, fontSize: 30 },
   featureCopy: { flex: 1, justifyContent: 'center', paddingRight: spacing.xs },
-  featureTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  featureTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   featureDescription: { color: palette.textSecondary, fontSize: 10, lineHeight: 15, marginTop: 3 },
   lofi: { color: palette.clay, fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   muted: { color: palette.textSecondary, fontSize: 10 },
   activityCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 74, padding: spacing.sm, backgroundColor: palette.surface, borderRadius: borderRadius.small, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
   activityCardSelected: { borderColor: palette.sage, backgroundColor: palette.sagePale },
@@ -181,7 +182,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   activityIconSelected: { backgroundColor: palette.sageLight },
   activityIconText: { color: palette.sage, fontSize: 22 },
   activityCopy: { flex: 1 },
-  activityTitle: { color: palette.textPrimary, fontSize: 13, fontFamily: 'serif', fontWeight: '600' },
+  activityTitle: { color: palette.textPrimary, fontSize: 13, fontFamily: typography.fonts.display, fontWeight: '600' },
   activityDescription: { color: palette.textSecondary, fontSize: 9, marginTop: 2 },
   activityDuration: { color: palette.sage, fontSize: 9, fontWeight: '600', marginTop: 4 },
   selectText: { color: palette.clay, fontSize: 9, fontWeight: '600', paddingHorizontal: spacing.xs },

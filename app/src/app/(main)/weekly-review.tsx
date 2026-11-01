@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -130,7 +131,7 @@ export default function WeeklyReviewScreen() {
                   <Text style={styles.totalValue}>{weeklyCompleted} / {weeklyPlanned}</Text>
                   <Text style={styles.bodyText}>petits pas réalisés cette semaine</Text>
                   <Metric label="Habitudes" completed={weekly[0].completed} planned={weekly[0].planned} styles={styles} colors={colors} />
-                  <Metric label="Tâches planifiées" completed={weekly[1].completed} planned={weekly[1].planned} styles={styles} colors={colors} />
+                  <Metric label="Petits pas prévus" completed={weekly[1].completed} planned={weekly[1].planned} styles={styles} colors={colors} />
                   <Metric label="Exercices" completed={weekly[2].completed} planned={weekly[2].planned} styles={styles} colors={colors} />
                 </>
               )}
@@ -242,13 +243,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: spacing.md },
   backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: 'serif', fontWeight: '600', marginTop: 6 },
+  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 6 },
   subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 7 },
   sectionHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionMeta: { color: palette.textSecondary, fontSize: 9 },
   card: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, gap: spacing.md },
-  totalValue: { color: palette.sage, fontSize: 25, fontFamily: 'serif', fontWeight: '700' },
+  totalValue: { color: palette.sage, fontSize: 25, fontFamily: typography.fonts.display, fontWeight: '700' },
   bodyText: { color: palette.textSecondary, fontSize: 10, lineHeight: 16 },
   metric: { gap: 7 },
   metricHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -259,11 +260,11 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   ring: { width: 122, height: 122, alignSelf: 'center', position: 'relative', marginVertical: spacing.sm },
   ringDot: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
   ringCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  ringPercent: { color: palette.textPrimary, fontSize: 25, fontFamily: 'serif', fontWeight: '700' },
+  ringPercent: { color: palette.textPrimary, fontSize: 25, fontFamily: typography.fonts.display, fontWeight: '700' },
   ringCaption: { color: palette.textSecondary, fontSize: 9, marginTop: 1 },
   monthSummary: { color: palette.textPrimary, fontSize: 12, textAlign: 'center', fontWeight: '600' },
   lockedCard: { padding: spacing.md, marginTop: spacing.lg, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, gap: spacing.sm },
-  lockedTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  lockedTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   primaryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage, marginTop: spacing.xs },
   primaryButtonText: { color: palette.surface, fontSize: 11, fontWeight: '700' },
   errorText: { color: palette.error, fontSize: 11, lineHeight: 16, marginTop: spacing.sm },

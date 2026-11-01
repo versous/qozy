@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -8,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CosyButton } from '@/components/common/CosyButton';
 import { auth } from '@/services/firebase';
+import { queueOfflineWrite, saveCachedDocuments } from '@/services/offlineStore';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -24,8 +26,11 @@ type Activity = {
   detail: string;
   duration: number;
   icon: string;
+  category?: 'movement' | 'focus' | 'calm';
   image: 'movement' | 'focus' | 'calm' | 'nature';
   imageUri?: string;
+  imageCustomized?: boolean;
+  completedDate?: string;
   tasks?: ActivityTask[];
 };
 
@@ -35,7 +40,7 @@ const getTodayKey = () => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 const imageSources = {
-  movement: require('@/assets/images/exercise-room.jpg'),
+  movement: require('@/assets/images/exercise-session.jpg'),
   focus: require('@/assets/images/focus-room.jpg'),
   calm: require('@/assets/images/breathing-room.jpg'),
   nature: require('@/assets/images/home-hero.jpg'),
@@ -105,6 +110,32 @@ export default function MomentScreen() {
         ? { ...item, tasks: nextTasks }
         : item);
       await AsyncStorage.setItem(`${STORAGE_KEY}:${userId}`, JSON.stringify(nextActivities));
+      await saveCachedDocuments(userId, 'smallMoments', nextActivities);
+      await queueOfflineWrite({
+        collectionKey: 'smallMoments',
+        documentId: activity.id,
+        path: `users/${userId}/smallMoments/${activity.id}`,
+        kind: 'set',
+        data: {
+          title: activity.title,
+          detail: activity.detail,
+          duration: activity.duration,
+          icon: activity.icon,
+          category: activity.category ?? 'calm',
+          image: activity.image,
+          custom: true,
+          imageCustomized: activity.imageCustomized ?? false,
+          completedDate: activity.completedDate ?? null,
+          tasks: nextTasks.map((task) => ({
+            id: task.id,
+            title: task.title,
+            detail: task.detail,
+            completedDates: task.completedDates ?? [],
+          })),
+          ...(activity.imageUri?.startsWith('https://') ? { imageUri: activity.imageUri } : {}),
+          userId,
+        },
+      }, userId);
       setActivity({ ...activity, tasks: nextTasks });
       return true;
     } catch (reason) {
@@ -182,7 +213,7 @@ export default function MomentScreen() {
             </View>
 
             <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Mes tâches pour ce moment</Text>
+              <Text style={styles.sectionTitle}>Mes petits pas pour ce moment</Text>
               <Text style={styles.count}>{tasks.length}</Text>
             </View>
             {tasks.length ? tasks.map((task) => {
@@ -211,7 +242,7 @@ export default function MomentScreen() {
               </View>
             )}
 
-            <Text style={styles.addLabel}>Ajouter une tâche à cette fiche</Text>
+            <Text style={styles.addLabel}>Ajouter un petit pas à cette fiche</Text>
             <TextInput
               value={newTaskTitle}
               onChangeText={setNewTaskTitle}
@@ -254,7 +285,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   heroOverlay: { ...StyleSheet.absoluteFill, alignItems: 'flex-end', justifyContent: 'flex-end', padding: spacing.md },
   heroIcon: { fontSize: 36, textShadowColor: 'rgba(0,0,0,0.28)', textShadowRadius: 6 },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.9 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 4 },
   subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 4, marginBottom: spacing.md },
   progressCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.sagePale, marginBottom: spacing.lg },
   progressIcon: { color: palette.sage, fontSize: 22 },
@@ -262,7 +293,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   progressTitle: { color: palette.sage, fontSize: 12, fontWeight: '700' },
   progressHint: { color: palette.textSecondary, fontSize: 10, marginTop: 3 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 17, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '600' },
   count: { color: palette.textSecondary, fontSize: 10 },
   taskCard: { minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, marginBottom: spacing.xs, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   checkbox: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 7, borderWidth: 1, borderColor: palette.sage },

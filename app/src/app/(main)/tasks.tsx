@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +19,7 @@ import { CosyButton } from '@/components/common/CosyButton';
 import { DatePickerField } from '@/components/DatePickerField';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
+import { TimePickerField } from '@/components/TimePickerField';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type Habit, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
@@ -74,6 +76,7 @@ export default function TasksScreen() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskStartTime, setTaskStartTime] = useState<string | null>(null);
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('normal');
   const [taskError, setTaskError] = useState('');
   const [savingTask, setSavingTask] = useState(false);
@@ -89,6 +92,7 @@ export default function TasksScreen() {
     setTaskTitle(task?.title ?? '');
     setTaskDescription(task?.description ?? '');
     setTaskDueDate(task?.dueDate ?? '');
+    setTaskStartTime(task?.startTime ?? null);
     setTaskPriority(task?.priority ?? 'normal');
     setTaskError('');
     setIsTaskModalVisible(true);
@@ -120,6 +124,7 @@ export default function TasksScreen() {
         description: taskDescription,
         priority: taskPriority,
         dueDate: dueDate || null,
+        startTime: taskStartTime,
       }, editingTask?.id);
       setIsTaskModalVisible(false);
     } catch (reason) {
@@ -185,7 +190,7 @@ export default function TasksScreen() {
         </View>
         <Text style={styles.eyebrow}>{todayLabel} · MES PETITS PAS</Text>
         <Text style={styles.title}>Ma journée</Text>
-        <Text style={styles.subtitle}>Mes tâches et mes habitudes, sans pression.</Text>
+        <Text style={styles.subtitle}>Mes petits pas et mes habitudes, sans pression.</Text>
 
         <View style={styles.progressCard}>
           <View style={styles.progressIcon}><Text style={styles.progressIconText}>✳</Text></View>
@@ -213,7 +218,7 @@ export default function TasksScreen() {
 
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionTitle}>Mes tâches</Text>
+            <Text style={styles.sectionTitle}>Mes petits pas</Text>
             <Text style={styles.sectionHint}>Une chose après l’autre.</Text>
           </View>
           <Text style={styles.sectionCount}>{pendingTasks.length} à faire</Text>
@@ -262,6 +267,9 @@ export default function TasksScreen() {
                     </Text>
                     {task.dueDate ? (
                       <Text style={styles.dueDate}>Échéance · {task.dueDate}</Text>
+                    ) : null}
+                    {task.startTime ? (
+                      <Text style={styles.dueDate}>À {task.startTime}</Text>
                     ) : null}
                   </View>
                 </View>
@@ -560,6 +568,11 @@ export default function TasksScreen() {
               disabled={savingTask}
               placeholder="Choisir une date (facultatif)"
             />
+            <TimePickerField
+              value={taskStartTime}
+              onChange={setTaskStartTime}
+              disabled={savingTask}
+            />
             {taskError ? <Text style={styles.error}>{taskError}</Text> : null}
             <CosyButton
               title={savingTask ? 'Enregistrement…' : editingTask ? 'Enregistrer' : 'Ajouter à ma journée'}
@@ -581,10 +594,10 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.lg },
-  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 0.8, fontWeight: '700', marginBottom: 5 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600' },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600' },
   subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 4, marginBottom: spacing.md },
   progressCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
   progressIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
@@ -604,7 +617,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   filterText: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
   filterTextSelected: { color: palette.surface },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionHint: { color: palette.textSecondary, fontSize: 10, marginTop: 3 },
   sectionCount: { color: palette.textSecondary, fontSize: 10 },
   error: { color: palette.error, fontSize: 11, marginBottom: spacing.sm },
@@ -652,7 +665,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(42,48,39,0.38)' },
   modal: { padding: spacing.lg, paddingBottom: spacing.xl, backgroundColor: palette.background, borderTopLeftRadius: borderRadius.large, borderTopRightRadius: borderRadius.large },
   modalEyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 1, textAlign: 'center' },
-  modalTitle: { color: palette.textPrimary, fontSize: 22, fontFamily: 'serif', fontWeight: '600', textAlign: 'center', marginVertical: spacing.sm },
+  modalTitle: { color: palette.textPrimary, fontSize: 22, fontFamily: typography.fonts.display, fontWeight: '600', textAlign: 'center', marginVertical: spacing.sm },
   input: { minHeight: 50, backgroundColor: palette.surface, borderRadius: borderRadius.small, borderWidth: 1, borderColor: palette.border, paddingHorizontal: spacing.md, color: palette.textPrimary },
   descriptionInput: { minHeight: 72, paddingTop: spacing.sm, textAlignVertical: 'top' },
   formLabel: { color: palette.textPrimary, fontSize: 11, fontWeight: '600', marginBottom: spacing.xs },

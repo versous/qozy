@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -230,7 +231,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: spacing.md },
   backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: 'serif', fontWeight: '600', marginTop: 6 },
+  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 6 },
   subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 7 },
   activityCard: { padding: spacing.md, marginTop: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   cardHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

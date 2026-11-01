@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -320,6 +321,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   unscheduleButton: { width: 28, height: '100%', alignItems: 'center', justifyContent: 'center' },
   unscheduleText: { color: palette.surface, fontSize: 18 },
   empty: { padding: spacing.md, alignItems: 'center', borderRadius: borderRadius.medium, backgroundColor: palette.surface },
-  emptyTitle: { color: palette.textPrimary, fontFamily: 'serif', fontSize: 14, fontWeight: '600' },
+  emptyTitle: { color: palette.textPrimary, fontFamily: typography.fonts.display, fontSize: 14, fontWeight: '600' },
   emptyText: { color: palette.textSecondary, fontSize: 10, textAlign: 'center', marginTop: 4 },
 });

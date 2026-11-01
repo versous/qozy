@@ -1,7 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 
-import { auth } from '@/services/firebase';
+import { auth, db } from '@/services/firebase';
+import {
+  applyPendingWrites,
+  getCachedDocuments,
+  getPendingWrites,
+  queueOfflineWrite,
+  reportFirestoreConnectivity,
+  saveCachedDocuments,
+} from '@/services/offlineStore';
 
 const DAILY_GOAL_MILLILITERS = 2000;
 const entryCache = new Map<string, HydrationEntry[]>();
@@ -92,6 +101,7 @@ function loadEntries(storageKey: string) {
 
 function updateEntries(
   storageKey: string,
+  userId: string,
   update: (entries: HydrationEntry[]) => HydrationEntry[]
 ) {
   const previous = entryWriteQueues.get(storageKey) ?? Promise.resolve();
@@ -100,6 +110,34 @@ function updateEntries(
     const nextEntries = update(currentEntries);
     await AsyncStorage.setItem(storageKey, JSON.stringify(nextEntries));
     publishEntries(storageKey, nextEntries);
+    await saveCachedDocuments(userId, 'hydration', nextEntries);
+
+    const previousById = new Map(currentEntries.map((entry) => [entry.id, entry]));
+    const nextById = new Map(nextEntries.map((entry) => [entry.id, entry]));
+    const writes = [
+      ...nextEntries
+        .filter((entry) => JSON.stringify(previousById.get(entry.id)) !== JSON.stringify(entry))
+        .map((entry) => queueOfflineWrite({
+          collectionKey: 'hydration',
+          documentId: entry.id,
+          path: `users/${userId}/hydration/${entry.id}`,
+          kind: 'set' as const,
+          data: {
+            date: entry.date,
+            milliliters: entry.milliliters,
+            createdAt: entry.createdAt,
+          },
+        }, userId)),
+      ...currentEntries
+        .filter((entry) => !nextById.has(entry.id))
+        .map((entry) => queueOfflineWrite({
+          collectionKey: 'hydration',
+          documentId: entry.id,
+          path: `users/${userId}/hydration/${entry.id}`,
+          kind: 'delete' as const,
+        }, userId)),
+    ];
+    await Promise.all(writes);
   });
   entryWriteQueues.set(storageKey, operation.then(() => undefined, () => undefined));
   return operation;
@@ -130,15 +168,23 @@ export function useHydration() {
   }, [today]);
 
   useEffect(() => {
-    if (!storageKey || !queryKey) return;
+    if (!storageKey || !queryKey || !userId || !db) return;
 
     let active = true;
+    let receivedServerSnapshot = false;
+    let checkedLegacyMigration = false;
     const unsubscribe = subscribeToEntries(storageKey, (nextEntries) => {
       if (active) setEntries(nextEntries);
     });
-    void loadEntries(storageKey).then((nextEntries) => {
+    void Promise.all([
+      loadEntries(storageKey),
+      getCachedDocuments<HydrationEntry>(userId, 'hydration'),
+      getPendingWrites(userId, 'hydration'),
+    ]).then(([localEntries, cachedEntries, pendingWrites]) => {
       if (!active) return;
-      setEntries(nextEntries);
+      const base = cachedEntries.length ? cachedEntries : localEntries;
+      const visibleEntries = applyPendingWrites(base, pendingWrites);
+      publishEntries(storageKey, visibleEntries);
       setError(null);
       setLoadedKey(queryKey);
     }).catch((reason: unknown) => {
@@ -150,11 +196,70 @@ export function useHydration() {
       setLoadedKey(queryKey);
     });
 
+    const unsubscribeRemote = onSnapshot(
+      collection(db, 'users', userId, 'hydration'),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        const fromCache = snapshot.metadata.fromCache;
+        if (!fromCache) receivedServerSnapshot = true;
+        reportFirestoreConnectivity(userId, !fromCache);
+
+        const remoteEntries = snapshot.docs.map((document) => ({
+          ...document.data(),
+          id: document.id,
+        })).filter((entry): entry is HydrationEntry => normalizeEntries([entry]).length === 1);
+
+        void (async () => {
+          const localEntries = await loadEntries(storageKey);
+          if (!fromCache && !checkedLegacyMigration) {
+            checkedLegacyMigration = true;
+            const migrationKey = `${storageKey}:cloud-migrated`;
+            const alreadyMigrated = await AsyncStorage.getItem(migrationKey);
+            if (!alreadyMigrated && !remoteEntries.length && localEntries.length) {
+              await Promise.all(localEntries.map((entry) => queueOfflineWrite({
+                collectionKey: 'hydration',
+                documentId: entry.id,
+                path: `users/${userId}/hydration/${entry.id}`,
+                kind: 'set',
+                data: {
+                  date: entry.date,
+                  milliliters: entry.milliliters,
+                  createdAt: entry.createdAt,
+                },
+              }, userId)));
+              await AsyncStorage.setItem(migrationKey, 'true');
+            }
+          }
+
+          const baseEntries = fromCache && !receivedServerSnapshot
+            ? localEntries
+            : remoteEntries;
+          await saveCachedDocuments(userId, 'hydration', baseEntries);
+          const pendingWrites = await getPendingWrites(userId, 'hydration');
+          if (!active) return;
+          publishEntries(storageKey, applyPendingWrites(baseEntries, pendingWrites));
+          setLoadedKey(queryKey);
+          setError(null);
+        })().catch((reason: unknown) => {
+          if (!active) return;
+          setError(reason instanceof Error
+            ? `Impossible de synchroniser ton hydratation : ${reason.message}`
+            : 'Impossible de synchroniser ton hydratation.');
+        });
+      },
+      (reason) => {
+        reportFirestoreConnectivity(userId, false);
+        if (!active) return;
+        setError(reason.message || 'Impossible de synchroniser ton hydratation pour le moment.');
+      }
+    );
+
     return () => {
       active = false;
       unsubscribe();
+      unsubscribeRemote();
     };
-  }, [queryKey, storageKey]);
+  }, [queryKey, storageKey, userId]);
 
   const selectedEntries = useMemo(() => entries
     .filter((entry) => entry.date === selectedDate)
@@ -179,7 +284,8 @@ export function useHydration() {
     if (!storageKey || !queryKey || !isLoaded) {
       throw new Error('Ton suivi d’hydratation est encore en cours de chargement.');
     }
-    await updateEntries(storageKey, update);
+    if (!userId) throw new Error('Connecte-toi pour enregistrer ton hydratation.');
+    await updateEntries(storageKey, userId, update);
     setError(null);
   };
 

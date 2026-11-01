@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { typography } from '@/theme/typography';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -20,7 +21,10 @@ export default function BreathingScreen() {
     ? parsedMinutes
     : 10;
   const [duration, setDuration] = useState(initialDuration);
-  const music = useMusic();
+  const music = useMusic('meditation');
+  const pauseMeditation = music.pause;
+
+  useEffect(() => () => pauseMeditation(), [pauseMeditation]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -65,7 +69,27 @@ export default function BreathingScreen() {
             style={styles.musicButton}>
             <Text style={styles.musicButtonText}>{music.isPlaying ? 'Ⅱ  Pause' : '▷  Écouter'}</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Passer à la musique de méditation suivante"
+            onPress={music.nextTrack}
+            style={styles.musicButton}>
+            <Text style={styles.musicButtonText}>»</Text>
+          </Pressable>
         </View>
+        <Text style={styles.musicAvailability}>
+          {music.isPremium
+            ? 'Tous les titres de méditation Premium sont disponibles.'
+            : '2 titres inclus · 2 titres supplémentaires avec Premium.'}
+        </Text>
+        {!music.isPremium ? (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push('/premium')}
+            style={styles.premiumMusicLink}>
+            <Text style={styles.premiumMusicLinkText}>Découvrir les musiques Premium ›</Text>
+          </Pressable>
+        ) : null}
         <Text style={styles.durationHeading}>Combien de temps pour toi ?</Text>
         <View style={styles.durationOptions}>
           {[5, 10, 15, 20, 30, 45, 60].map((minutes) => (
@@ -109,8 +133,8 @@ export default function BreathingScreen() {
           <CosyButton
             title="Commencer doucement"
             onPress={() => router.push({
-              pathname: '/meditation-session',
-              params: { activity, minutes: String(duration) },
+              pathname: '/activity-ready',
+              params: { activity, minutes: String(duration), category: 'meditation' },
             })}
             style={styles.primaryButton}
           />
@@ -127,10 +151,10 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   back: { alignSelf: 'flex-start', marginBottom: spacing.sm },
   backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.md },
-  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 4 },
   subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
   breathingCard: { height: 330, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
   breathingImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
@@ -138,15 +162,18 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   imageLabel: { position: 'absolute', top: spacing.md, color: palette.sage, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
   breathCircle: { width: 178, height: 178, alignItems: 'center', justifyContent: 'center', borderRadius: 89, borderWidth: 1, borderColor: palette.sage, backgroundColor: palette.surface },
   phaseLabel: { color: palette.sage, fontSize: 13, fontWeight: '600' },
-  phaseSecond: { color: palette.sage, fontSize: 52, fontFamily: 'serif', lineHeight: 60 },
+  phaseSecond: { color: palette.sage, fontSize: 52, fontFamily: typography.fonts.display, lineHeight: 60 },
   secondsLabel: { color: palette.textSecondary, fontSize: 9 },
-  encouragement: { color: palette.textSecondary, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
+  encouragement: { color: palette.textSecondary, fontSize: 11, fontFamily: typography.fonts.display, fontStyle: 'italic', textAlign: 'center', marginVertical: spacing.md },
   musicCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.peachLight, marginBottom: spacing.md },
   musicCopy: { flex: 1, gap: 4 },
   musicTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
   musicSubtitle: { color: palette.textSecondary, fontSize: 9, lineHeight: 14 },
   musicButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
   musicButtonText: { color: palette.surface, fontSize: 9, fontWeight: '700' },
+  musicAvailability: { color: palette.textSecondary, fontSize: 9, marginTop: -spacing.sm, marginBottom: spacing.xs },
+  premiumMusicLink: { alignSelf: 'flex-start', marginBottom: spacing.md, paddingVertical: spacing.xs },
+  premiumMusicLinkText: { color: palette.sage, fontSize: 10, fontWeight: '700' },
   durationHeading: { color: palette.textPrimary, fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },
   durationOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
   durationOption: { minWidth: 48, alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 8, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
@@ -154,7 +181,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   durationText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600' },
   durationTextSelected: { color: palette.surface },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   seeAll: { color: palette.sage, fontSize: 10, fontWeight: '600' },
   audioCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
   audioIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: palette.sagePale },

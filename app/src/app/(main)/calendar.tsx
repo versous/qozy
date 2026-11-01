@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -289,7 +290,7 @@ export default function CalendarScreen() {
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={[styles.indicator, styles.taskIndicator]} />
-              <Text style={styles.legendText}>Tâches</Text>
+              <Text style={styles.legendText}>Petits pas</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.indicator, styles.habitIndicator]} />
@@ -580,7 +581,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   brand: {
     color: palette.sage,
     fontSize: 24,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '700',
   },
   brandCaption: {
@@ -597,7 +598,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   },
   title: {
     color: palette.textPrimary,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontSize: 30,
     fontWeight: '600',
     marginTop: spacing.xs,
@@ -636,7 +637,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   },
   monthTitle: {
     color: palette.textPrimary,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -728,7 +729,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   },
   sectionTitle: {
     color: palette.textPrimary,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontSize: 21,
     fontWeight: '600',
   },
@@ -991,7 +992,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   modalTitle: {
     color: palette.textPrimary,
     fontSize: 22,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
     textAlign: 'center',
     marginVertical: spacing.sm,

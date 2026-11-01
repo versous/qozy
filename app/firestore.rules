@@ -211,6 +211,59 @@ service cloud.firestore {
             && request.resource.data.durationMinutes <= 480));
     }
 
+    match /users/{userId}/hydration/{entryId} {
+      allow read, delete: if request.auth != null
+        && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'date', 'milliliters', 'createdAt'
+        ])
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.milliliters is int
+        && request.resource.data.milliliters > 0
+        && request.resource.data.milliliters <= 5000
+        && request.resource.data.createdAt is int
+        && request.resource.data.createdAt > 0;
+    }
+
+    match /users/{userId}/smallMoments/{activityId} {
+      allow read, delete: if request.auth != null
+        && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && request.resource.data.custom == true
+        && request.resource.data.keys().hasOnly([
+          'title', 'detail', 'duration', 'icon', 'category', 'image',
+          'custom', 'imageCustomized', 'completedDate', 'tasks',
+          'imageUri', 'userId'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 40
+        && request.resource.data.detail is string
+        && request.resource.data.detail.size() <= 500
+        && request.resource.data.duration is int
+        && request.resource.data.duration >= 1
+        && request.resource.data.duration <= 90
+        && request.resource.data.icon is string
+        && request.resource.data.icon.size() <= 16
+        && request.resource.data.category in ['movement', 'focus', 'calm']
+        && request.resource.data.image in ['movement', 'focus', 'calm', 'nature']
+        && request.resource.data.imageCustomized is bool
+        && (request.resource.data.completedDate == null
+          || request.resource.data.completedDate is string)
+        && request.resource.data.tasks is list
+        && request.resource.data.tasks.size() <= 100
+        && (!request.resource.data.keys().hasAny(['imageUri'])
+          || (request.resource.data.imageUri is string
+            && request.resource.data.imageUri.matches('^https://.*')));
+    }
+
     match /users/{userId}/monthlyGoals/{month} {
       allow read: if request.auth != null
         && request.auth.uid == userId;

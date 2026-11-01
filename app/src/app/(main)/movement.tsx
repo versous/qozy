@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -49,16 +50,16 @@ export default function MovementScreen() {
 
         <View style={styles.hero}>
           <Image
-            source={require('@/assets/images/exercise-room.jpg')}
+            source={require('@/assets/images/exercise-session.jpg')}
             resizeMode="cover"
             style={styles.heroImage}
-            accessibilityLabel="Un moment calme pour bouger à la maison"
+            accessibilityLabel="Une personne pratique une posture sportive sur un tapis"
           />
           <View style={styles.heroScrim} />
           <View style={styles.heroCopy}>
             <Text style={styles.heroTitle}>Un moment pour toi</Text>
             <Text style={styles.heroSubtitle}>On bouge ensemble, à ton rythme.</Text>
-            <Text style={styles.lofi}>♫  AMBIANCE LOFI</Text>
+            <Text style={styles.lofi}>⚡  MUSIQUE POUR BOUGER</Text>
           </View>
         </View>
 
@@ -130,8 +131,12 @@ export default function MovementScreen() {
           <CosyButton
             title={`▷  Faire mon prochain exercice · ${nextExercise.duration} min`}
             onPress={() => router.push({
-              pathname: '/focus',
-              params: { activity: nextExercise.name, minutes: String(nextExercise.duration) },
+              pathname: '/activity-ready',
+              params: {
+                activity: nextExercise.name,
+                minutes: String(nextExercise.duration),
+                category: 'sport',
+              },
             })}
             style={styles.primaryButton}
           />
@@ -164,16 +169,16 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   back: { alignSelf: 'flex-start', marginBottom: spacing.sm },
   backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.md },
-  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: 'serif', fontWeight: '700' },
+  brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
-  title: { color: palette.textPrimary, fontSize: 26, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  title: { color: palette.textPrimary, fontSize: 26, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 4 },
   subtitle: { color: palette.textSecondary, fontSize: 12, marginTop: 3, marginBottom: spacing.md },
   hero: { height: 138, overflow: 'hidden', borderRadius: borderRadius.medium, marginBottom: spacing.sm, justifyContent: 'center' },
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(40,43,34,0.18)' },
   heroCopy: { maxWidth: '62%', padding: spacing.md },
-  heroTitle: { color: '#FFFDF7', fontSize: 17, fontFamily: 'serif', fontWeight: '700' },
+  heroTitle: { color: '#FFFDF7', fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '700' },
   heroSubtitle: { color: '#FFFDF7', fontSize: 10, lineHeight: 15, marginTop: 4 },
   lofi: { color: '#FFFDF7', fontSize: 8, fontWeight: '700', letterSpacing: 0.6, marginTop: 6 },
   progressCard: { padding: spacing.sm, backgroundColor: palette.sagePale, borderRadius: borderRadius.small, marginBottom: spacing.md },
@@ -184,7 +189,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: palette.sage },
   progressCount: { color: palette.textSecondary, fontSize: 8, textAlign: 'right', marginTop: 4 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionCount: { color: palette.textSecondary, fontSize: 9 },
   error: { color: palette.error, fontSize: 10, marginBottom: spacing.sm },
   exerciseCard: { minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
@@ -207,5 +212,5 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   secondaryButton: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   secondaryIcon: { color: palette.sage, fontSize: 15 },
   secondaryText: { color: palette.sage, fontSize: 9, fontWeight: '600' },
-  congrats: { color: palette.sage, fontSize: 11, fontFamily: 'serif', fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
+  congrats: { color: palette.sage, fontSize: 11, fontFamily: typography.fonts.display, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.md },
 });

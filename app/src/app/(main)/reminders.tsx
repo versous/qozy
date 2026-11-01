@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -229,7 +230,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1, fontWeight: '700', marginTop: spacing.sm },
-  title: { color: palette.textPrimary, fontSize: 26, lineHeight: 33, fontFamily: 'serif', fontWeight: '600', marginTop: 6 },
+  title: { color: palette.textPrimary, fontSize: 26, lineHeight: 33, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 6 },
   subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 6, marginBottom: spacing.md },
   card: { padding: spacing.md, marginTop: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

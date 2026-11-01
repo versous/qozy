@@ -36,7 +36,8 @@ export interface TodoTask {
   createdAt: Timestamp;
 }
 
-type TaskInput = Pick<TodoTask, 'title' | 'description' | 'priority' | 'dueDate'>;
+type TaskInput = Pick<TodoTask, 'title' | 'description' | 'priority' | 'dueDate'>
+  & Pick<TodoTask, 'startTime'>;
 
 function normalizeTask(task: TodoTask): TodoTask {
   return {
@@ -125,15 +126,20 @@ export function useTasks() {
     if (!db || !userId) throw new Error('Connectez-vous pour enregistrer une tâche.');
     const title = input.title.trim();
     if (!title) throw new Error('Le titre de la tâche ne peut pas être vide.');
+    if (input.startTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime)) {
+      throw new Error('Choisis une heure valide.');
+    }
 
+    const existingTask = taskId ? tasks.find((task) => task.id === taskId) : undefined;
     const taskData = {
       title,
       description: input.description.trim(),
       priority: input.priority,
       dueDate: input.dueDate,
-      ...(taskId && tasks.find((task) => task.id === taskId)?.dueDate !== input.dueDate
-        ? { startTime: null, durationMinutes: null }
-        : {}),
+      startTime: input.startTime ?? null,
+      durationMinutes: input.startTime
+        ? existingTask?.durationMinutes ?? 60
+        : null,
       userId,
     };
 

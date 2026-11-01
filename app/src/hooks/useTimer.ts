@@ -5,10 +5,17 @@ export const useTimer = (initialMinutes = 25, onComplete?: () => void) => {
   const [isActive, setIsActive] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const secondsLeftRef = useRef(initialMinutes * 60);
+  const isActiveRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const startTimer = useCallback(() => {
-    if (isActive || timerRef.current || secondsLeftRef.current <= 0) return;
+    if (isActiveRef.current || timerRef.current || secondsLeftRef.current <= 0) return;
 
+    isActiveRef.current = true;
     setIsActive(true);
     timerRef.current = setInterval(() => {
       const next = secondsLeftRef.current - 1;
@@ -20,17 +27,19 @@ export const useTimer = (initialMinutes = 25, onComplete?: () => void) => {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
+        isActiveRef.current = false;
         setIsActive(false);
-        onComplete?.();
+        onCompleteRef.current?.();
       }
     }, 1000);
-  }, [isActive, onComplete]);
+  }, []);
 
   const pauseTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    isActiveRef.current = false;
     setIsActive(false);
   }, []);
 
@@ -43,6 +52,8 @@ export const useTimer = (initialMinutes = 25, onComplete?: () => void) => {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+      isActiveRef.current = false;
     };
   }, []);
 

@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -22,11 +23,22 @@ import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
+import { AmbientGlow } from '@/components/SessionDeviceStatus';
+import { useTasks } from '@/hooks/useTasks';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { useHydration } from '@/hooks/useHydration';
-import { auth } from '@/services/firebase';
+import { auth, db } from '@/services/firebase';
+import {
+  applyPendingWrites,
+  getCachedDocuments,
+  getPendingWrites,
+  queueOfflineWrite,
+  reportFirestoreConnectivity,
+  saveCachedDocuments,
+} from '@/services/offlineStore';
+import { usePremium } from '@/services/PremiumProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
@@ -53,17 +65,46 @@ type ActivityTask = {
   id: string;
   title: string;
   detail: string;
-  completedDate?: string;
+  completedDates?: string[];
 };
 
 const ACTIVITY_STORAGE_KEY = 'qozy-small-moments';
+const ACTIVITY_COLLECTION_KEY = 'smallMoments';
 const activityImages: { id: ActivityImageId; label: string; source: number }[] = [
-  { id: 'movement', label: 'Mouvement', source: require('@/assets/images/exercise-room.jpg') },
+  { id: 'movement', label: 'Mouvement', source: require('@/assets/images/exercise-session.jpg') },
   { id: 'focus', label: 'Concentration', source: require('@/assets/images/focus-room.jpg') },
   { id: 'calm', label: 'Calme', source: require('@/assets/images/breathing-room.jpg') },
   { id: 'nature', label: 'Nature', source: require('@/assets/images/home-hero.jpg') },
 ];
 const activityIcons = ['🌿', '☀️', '🧘', '📖', '🎨', '🚶', '☕', '✨'];
+const toCloudActivity = (activity: Activity, userId: string) => ({
+  title: activity.title,
+  detail: activity.detail,
+  duration: activity.duration,
+  icon: activity.icon,
+  category: activity.category,
+  image: activity.image,
+  custom: true,
+  imageCustomized: activity.imageCustomized ?? false,
+  completedDate: activity.completedDate ?? null,
+  tasks: (activity.tasks ?? []).map((task) => ({
+    id: task.id,
+    title: task.title,
+    detail: task.detail,
+    completedDates: task.completedDates ?? [],
+  })),
+  ...(activity.imageUri?.startsWith('https://') ? { imageUri: activity.imageUri } : {}),
+  userId,
+});
+async function queueActivitySet(userId: string, activity: Activity) {
+  await queueOfflineWrite({
+    collectionKey: ACTIVITY_COLLECTION_KEY,
+    documentId: activity.id,
+    path: `users/${userId}/${ACTIVITY_COLLECTION_KEY}/${activity.id}`,
+    kind: 'set',
+    data: toCloudActivity(activity, userId),
+  }, userId);
+}
 const activityIdeas: {
   title: string;
   detail: string;
@@ -183,17 +224,24 @@ const defaultActivities: Activity[] = [
   { id: 'meditation', title: 'Méditation', detail: 'Prendre un instant pour soi', duration: 10, icon: '◉', category: 'calm', image: 'calm' },
 ];
 
-const todayLabel = new Date().toLocaleDateString('fr-FR', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-});
+type DayPeriod = 'morning' | 'day' | 'evening';
+
+const getDayPeriod = (date: Date): DayPeriod => {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 18) return 'day';
+  return 'evening';
+};
 
 export default function Dashboard() {
   const colors = useAppTheme().colors;
+  const { isPremium } = usePremium();
   const styles = createStyles(colors);
   const { habits, allHabits, loading, error, addHabit, toggleHabit, updateHabitProgress, deleteHabit } = useHabits();
+  const { tasks: todoTasks, loading: todoTasksLoading } = useTasks();
   const hydration = useHydration();
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const dismissHabitSheet = useCallback(() => setIsModalVisible(false), []);
   const [newHabitTitle, setNewHabitTitle] = useState('');
@@ -223,10 +271,30 @@ export default function Dashboard() {
   const [customActivities, setCustomActivities] = useState<Activity[]>([]);
   const [loadedActivityUserId, setLoadedActivityUserId] = useState<string | null>(null);
   const cleanedLireHabitsUserId = React.useRef<string | null>(null);
-  const firstName = auth?.currentUser?.displayName?.split(' ')[0] || 'toi';
+  const firstName = auth?.currentUser?.displayName?.trim().split(/\s+/)[0] || null;
   const userId = auth?.currentUser?.uid ?? null;
   const visibleCustomActivities = userId && loadedActivityUserId === userId ? customActivities : [];
   const visibleActivities = [...defaultActivities, ...visibleCustomActivities];
+  const dayPeriod = getDayPeriod(currentTime);
+  const todayLabel = currentTime.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const pendingTodoTasks = todoTasks.filter((task) => !task.completed);
+  const contextualActivityCategories: ActivityCategory[] = dayPeriod === 'morning'
+    ? ['movement', 'calm']
+    : dayPeriod === 'day' ? ['focus', 'movement'] : ['calm'];
+  const contextualActivities = visibleActivities.filter((activity) =>
+    contextualActivityCategories.includes(activity.category));
+  const displayedActivities = showAllActivities ? visibleActivities : contextualActivities;
+
+  useFocusEffect(useCallback(() => {
+    const refreshTime = () => setCurrentTime(new Date());
+    refreshTime();
+    const interval = setInterval(refreshTime, 60_000);
+    return () => clearInterval(interval);
+  }, []));
 
   React.useEffect(() => {
     if (!userId || loading || error || cleanedLireHabitsUserId.current === userId) return;
@@ -250,33 +318,36 @@ export default function Dashboard() {
   }, [allHabits, deleteHabit, error, loading, userId]);
 
   useFocusEffect(useCallback(() => {
-    if (!userId) return;
+    if (!userId || !db) return;
     let active = true;
-    void AsyncStorage.getItem(`${ACTIVITY_STORAGE_KEY}:${userId}`).then((stored) => {
+    const storageKey = `${ACTIVITY_STORAGE_KEY}:${userId}`;
+    const isActivity = (activity: unknown): activity is Activity => (
+      Boolean(activity)
+      && typeof activity === 'object'
+      && typeof (activity as Activity).id === 'string'
+      && typeof (activity as Activity).title === 'string'
+      && typeof (activity as Activity).detail === 'string'
+      && typeof (activity as Activity).duration === 'number'
+      && (activity as Activity).duration >= 1
+      && (activity as Activity).duration <= 90
+      && typeof (activity as Activity).icon === 'string'
+      && ['movement', 'focus', 'calm'].includes((activity as Activity).category)
+      && ['movement', 'focus', 'calm', 'nature'].includes((activity as Activity).image)
+      && ((activity as Activity).imageUri === undefined || typeof (activity as Activity).imageUri === 'string')
+      && ((activity as Activity).imageCustomized === undefined || typeof (activity as Activity).imageCustomized === 'boolean')
+    );
+
+    void Promise.all([
+      AsyncStorage.getItem(storageKey),
+      getCachedDocuments<Activity>(userId, ACTIVITY_COLLECTION_KEY),
+      getPendingWrites(userId, ACTIVITY_COLLECTION_KEY),
+    ]).then(([stored, cached, pending]) => {
       if (!active) return;
-      if (!stored) {
-        setCustomActivities([]);
-      } else {
-        const parsed: unknown = JSON.parse(stored);
-        const validActivities = Array.isArray(parsed)
-          ? parsed.filter((activity): activity is Activity => (
-            Boolean(activity)
-            && typeof activity === 'object'
-            && typeof activity.id === 'string'
-            && typeof activity.title === 'string'
-            && typeof activity.detail === 'string'
-            && typeof activity.duration === 'number'
-            && activity.duration >= 1
-            && activity.duration <= 90
-            && typeof activity.icon === 'string'
-            && ['movement', 'focus', 'calm'].includes(activity.category)
-            && ['movement', 'focus', 'calm', 'nature'].includes(activity.image)
-            && (activity.imageUri === undefined || typeof activity.imageUri === 'string')
-            && (activity.imageCustomized === undefined || typeof activity.imageCustomized === 'boolean')
-          ))
-          : [];
-        setCustomActivities(validActivities);
-      }
+      const localActivities = stored ? JSON.parse(stored) as unknown : [];
+      const validLocal = Array.isArray(localActivities) ? localActivities.filter(isActivity) : [];
+      const cache = cached.length ? cached : validLocal;
+      const merged = applyPendingWrites(cache, pending).filter(isActivity);
+      setCustomActivities(merged);
       setLoadedActivityUserId(userId);
     }).catch((reason: unknown) => {
       if (active) {
@@ -286,8 +357,98 @@ export default function Dashboard() {
         );
       }
     });
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'users', userId, ACTIVITY_COLLECTION_KEY),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        const fromCache = snapshot.metadata.fromCache;
+        reportFirestoreConnectivity(userId, !fromCache);
+        const remote = snapshot.docs
+          .map((document) => ({ ...document.data(), id: document.id }))
+          .filter(isActivity);
+
+        void (async () => {
+          const [cached, stored] = await Promise.all([
+            getCachedDocuments<Activity>(userId, ACTIVITY_COLLECTION_KEY),
+            AsyncStorage.getItem(storageKey),
+          ]);
+          const parsedStored: unknown = stored ? JSON.parse(stored) : [];
+          const local = Array.isArray(parsedStored) ? parsedStored.filter(isActivity) : [];
+          const localById = new Map(
+            [...cached, ...local].map((activity) => [activity.id, activity]),
+          );
+          const migrationKey = `${storageKey}:cloud-migrated`;
+          let migrationState = fromCache ? null : await AsyncStorage.getItem(migrationKey);
+          if (!fromCache && !migrationState) {
+            if (!remote.length && local.length) {
+              await Promise.all(local.map((activity) => queueOfflineWrite({
+                collectionKey: ACTIVITY_COLLECTION_KEY,
+                documentId: activity.id,
+                path: `users/${userId}/${ACTIVITY_COLLECTION_KEY}/${activity.id}`,
+                kind: 'set',
+                data: toCloudActivity(activity, userId),
+              }, userId)));
+              migrationState = `pending:${local.length}`;
+            } else {
+              migrationState = 'true';
+            }
+            await AsyncStorage.setItem(migrationKey, migrationState);
+          }
+
+          const pendingMigrationCount = migrationState?.startsWith('pending:')
+            ? Number(migrationState.slice('pending:'.length))
+            : null;
+          if (
+            !fromCache
+            && pendingMigrationCount !== null
+            && remote.length >= pendingMigrationCount
+          ) {
+            migrationState = 'true';
+            await AsyncStorage.setItem(migrationKey, 'true');
+          }
+          const migrationInProgress = migrationState?.startsWith('pending:') ?? false;
+          const remoteWithMigratedLocal = migrationInProgress
+            ? [...remote, ...local.filter((activity) => !remote.some((item) => item.id === activity.id))]
+            : remote;
+          const base = fromCache
+            ? (cached.length ? cached : local)
+            : remoteWithMigratedLocal;
+          const withLocalPhotos = base.map((activity) => ({
+            ...activity,
+            imageUri: activity.imageUri ?? localById.get(activity.id)?.imageUri,
+          }));
+          const latestPending = await getPendingWrites(userId, ACTIVITY_COLLECTION_KEY);
+          const visible = applyPendingWrites(withLocalPhotos, latestPending).filter(isActivity);
+          await Promise.all([
+            saveCachedDocuments(userId, ACTIVITY_COLLECTION_KEY, visible),
+            AsyncStorage.setItem(storageKey, JSON.stringify(visible)),
+          ]);
+          if (!active) return;
+          setCustomActivities(visible);
+          setLoadedActivityUserId(userId);
+        })().catch((reason: unknown) => {
+          if (active) {
+            Alert.alert(
+              'Synchronisation des petits moments impossible',
+              reason instanceof Error ? reason.message : 'Tes petits moments restent disponibles sur cet appareil.',
+            );
+          }
+        });
+      },
+      (reason) => {
+        reportFirestoreConnectivity(userId, false);
+        if (!active) return;
+        Alert.alert(
+          'Synchronisation indisponible',
+          reason.message || 'Tes petits moments restent disponibles sur cet appareil.',
+        );
+      },
+    );
+
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [userId]));
 
@@ -459,6 +620,8 @@ export default function Dashboard() {
       : [...customActivities, updatedActivity];
     try {
       await AsyncStorage.setItem(`${ACTIVITY_STORAGE_KEY}:${userId}`, JSON.stringify(nextActivities));
+      await saveCachedDocuments(userId, ACTIVITY_COLLECTION_KEY, nextActivities);
+      await queueActivitySet(userId, updatedActivity);
       setCustomActivities(nextActivities);
       if (editingActivity?.imageUri && editingActivity.imageUri !== imageUri) {
         removeActivityPhoto(editingActivity.imageUri);
@@ -487,7 +650,14 @@ export default function Dashboard() {
         onPress: () => {
           const nextActivities = customActivities.filter((activity) => activity.id !== editingActivity.id);
           void AsyncStorage.setItem(`${ACTIVITY_STORAGE_KEY}:${userId}`, JSON.stringify(nextActivities))
-            .then(() => {
+            .then(async () => {
+              await saveCachedDocuments(userId, ACTIVITY_COLLECTION_KEY, nextActivities);
+              await queueOfflineWrite({
+                collectionKey: ACTIVITY_COLLECTION_KEY,
+                documentId: editingActivity.id,
+                path: `users/${userId}/${ACTIVITY_COLLECTION_KEY}/${editingActivity.id}`,
+                kind: 'delete',
+              }, userId);
               setCustomActivities(nextActivities);
               removeActivityPhoto(editingActivity.imageUri);
               setEditingActivity(null);
@@ -547,43 +717,150 @@ export default function Dashboard() {
             accessibilityLabel="Ouvrir mon compte"
             onPress={() => router.push('/profile')}
             style={styles.avatar}>
-            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{firstName?.charAt(0).toUpperCase() ?? 'Q'}</Text>
           </Pressable>
         </View>
 
         <Text style={styles.dateLabel}>{todayLabel}</Text>
-        <Text style={styles.pageTitle}>Une chose à la fois, {firstName}.</Text>
+        <Text style={styles.pageTitle}>
+          {firstName ? `Une chose à la fois, ${firstName}` : 'Une chose à la fois'}
+        </Text>
 
         <View style={styles.heroCard}>
           <Image
-            source={require('@/assets/images/home-hero.jpg')}
+            source={dayPeriod === 'morning'
+              ? require('@/assets/images/home-hero.jpg')
+              : dayPeriod === 'day'
+                ? require('@/assets/images/focus-room.jpg')
+                : require('@/assets/images/breathing-room.jpg')}
             contentFit="cover"
             transition={180}
             style={styles.heroImage}
-            accessibilityLabel="Une personne profite d'un moment calme chez elle" />
+            accessibilityLabel={dayPeriod === 'morning'
+              ? 'Un réveil doux dans un intérieur lumineux'
+              : dayPeriod === 'day'
+                ? 'Un coin bureau cosy éclairé par une lampe'
+                : 'Un espace calme pour déposer sa journée'} />
+          <AmbientGlow />
           <View style={styles.heroOverlay}>
             <View style={styles.heroPill}>
-              <Text style={styles.heroPillText}>☀  Un matin tout doux</Text>
+              <Text style={styles.heroPillText}>
+                {dayPeriod === 'morning'
+                  ? '☀  Un matin tout doux'
+                  : dayPeriod === 'day' ? '🌿  À ton rythme' : '☾  Une soirée plus légère'}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.focusCard}>
+          <Image
+            source={dayPeriod === 'morning'
+              ? require('@/assets/images/home-hero.jpg')
+              : dayPeriod === 'day'
+                ? require('@/assets/images/focus-room.jpg')
+                : require('@/assets/images/breathing-room.jpg')}
+            contentFit="cover"
+            style={styles.focusIllustration}
+            accessibilityLabel={dayPeriod === 'morning'
+              ? 'Une pièce lumineuse pour commencer la journée'
+              : dayPeriod === 'day'
+                ? 'Un coin bureau cosy éclairé par une lampe'
+                : 'Un coin paisible pour se détendre'}
+          />
           <View style={styles.focusIcon}>
-            <Text style={styles.focusIconText}>◷</Text>
+            <Text style={styles.focusIconText}>
+              {dayPeriod === 'morning' ? '☀' : dayPeriod === 'day' ? '◷' : '☾'}
+            </Text>
           </View>
           <View style={styles.focusCopy}>
-            <Text style={styles.eyebrow}>UN PEU DE CONCENTRATION</Text>
-            <Text style={styles.focusTitle}>Un focus de 25 minutes</Text>
+            <Text style={styles.eyebrow}>
+              {dayPeriod === 'morning'
+                ? 'DOUCEUR DU MATIN'
+                : dayPeriod === 'day' ? 'UN PEU DE CONCENTRATION' : 'POUR FINIR LA JOURNÉE EN DOUCEUR'}
+            </Text>
+            <Text style={styles.focusTitle}>
+              {dayPeriod === 'morning'
+                ? 'Routine de réveil'
+                : dayPeriod === 'day' ? 'Un focus de 25 minutes' : 'Déposer sa journée'}
+            </Text>
+            <Text style={styles.contextualDescription}>
+              {dayPeriod === 'morning'
+                ? 'Une respiration et une intention douce pour commencer.'
+                : dayPeriod === 'day'
+                  ? 'Choisis un petit pas et avance à ton rythme.'
+                  : 'Relâche les tensions et garde un instant pour toi.'}
+            </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/prepare', params: { activity: 'Lire' } })}
+            onPress={() => {
+              if (dayPeriod === 'day') {
+                router.push({
+                  pathname: '/prepare',
+                  params: { activity: pendingTodoTasks[0]?.title ?? 'Lire' },
+                });
+              } else {
+                router.push({
+                  pathname: '/breathing',
+                  params: {
+                    activity: dayPeriod === 'morning' ? 'Routine de réveil' : 'Déposer sa journée',
+                    minutes: dayPeriod === 'morning' ? '5' : '10',
+                  },
+                });
+              }
+            }}
             style={({ pressed }) => [styles.focusAction, pressed && styles.pressed]}>
-            <Text style={styles.focusActionText}>Entrer dans ma bulle</Text>
+            <Text style={styles.focusActionText}>
+              {dayPeriod === 'morning'
+                ? 'Commencer en douceur'
+                : dayPeriod === 'day' ? 'Entrer dans ma bulle' : 'Prendre une pause'}
+            </Text>
             <Text style={styles.actionArrow}>›</Text>
           </Pressable>
         </View>
+
+        {dayPeriod === 'morning' ? (
+          <View style={styles.intentionCard}>
+            <Text style={styles.intentionIcon}>✳</Text>
+            <View style={styles.intentionCopy}>
+              <Text style={styles.intentionLabel}>MON INTENTION DOUCE</Text>
+              <Text style={styles.intentionText}>Aujourd’hui, je peux commencer doucement.</Text>
+            </View>
+          </View>
+        ) : dayPeriod === 'day' ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/tasks')}
+            style={styles.contextualStepsCard}>
+            <View style={styles.contextualStepsHeading}>
+              <Text style={styles.contextualStepsTitle}>Mes petits pas en cours</Text>
+              <Text style={styles.contextualStepsCount}>
+                {todoTasksLoading ? '…' : `${pendingTodoTasks.length} en cours`}
+              </Text>
+            </View>
+            {pendingTodoTasks.length ? (
+              pendingTodoTasks.slice(0, 2).map((task) => (
+                <View key={task.id} style={styles.contextualStepRow}>
+                  <View style={styles.contextualStepDot} />
+                  <Text numberOfLines={1} style={styles.contextualStepText}>{task.title}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.contextualStepsHint}>
+                Aucun petit pas pressant. Choisis une seule chose, si tu en as envie.
+              </Text>
+            )}
+          </Pressable>
+        ) : (
+          <View style={styles.intentionCard}>
+            <Text style={styles.intentionIcon}>☾</Text>
+            <View style={styles.intentionCopy}>
+              <Text style={styles.intentionLabel}>TU PEUX RELÂCHER</Text>
+              <Text style={styles.intentionText}>Tout n’a pas besoin d’être réglé ce soir.</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.hydrationCard}>
           <View style={styles.hydrationHeading}>
@@ -644,14 +921,27 @@ export default function Dashboard() {
 
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionTitle}>Mes petits moments</Text>
-            <Text style={styles.sectionSubtitle}>Choisis un petit moment pour toi.</Text>
+            <Text style={styles.sectionTitle}>
+              {dayPeriod === 'morning'
+                ? 'Pour commencer doucement'
+                : dayPeriod === 'day' ? 'Petits moments pour avancer' : 'Bulles de décompression'}
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              {dayPeriod === 'evening'
+                ? 'Choisis une pause qui te fait du bien.'
+                : 'Choisis un petit moment pour toi.'}
+            </Text>
           </View>
-          <Text style={styles.sectionAccent}>{visibleActivities.length} idées</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowAllActivities((shown) => !shown)}
+            hitSlop={8}>
+            <Text style={styles.seeAll}>{showAllActivities ? 'Voir moins' : 'Tout voir'}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.activityList}>
-          {visibleActivities.map((activity) => (
+          {displayedActivities.map((activity) => (
             <View key={activity.id} style={styles.activityCard}>
               <Pressable
                 accessibilityRole="button"
@@ -704,7 +994,13 @@ export default function Dashboard() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Modifier ${activity.title}`}
-                  onPress={() => openActivityEditor(activity)}
+                  onPress={() => {
+                    if (isPremium) {
+                      openActivityEditor(activity);
+                    } else {
+                      router.push('/premium');
+                    }
+                  }}
                   hitSlop={8}
                   style={styles.activityEditButton}>
                   <Text style={styles.activityEditText}>✎</Text>
@@ -715,6 +1011,10 @@ export default function Dashboard() {
           <Pressable
             accessibilityRole="button"
             onPress={() => {
+              if (!isPremium) {
+                router.push('/premium');
+                return;
+              }
               setEditingActivity(null);
               setNewActivityTitle('');
               setNewActivityDetail('');
@@ -731,8 +1031,14 @@ export default function Dashboard() {
             style={({ pressed }) => [styles.addActivityCard, pressed && styles.pressed]}>
             <View style={styles.addActivityIcon}><Text style={styles.addActivityIconText}>＋</Text></View>
             <View style={styles.activityCopy}>
-              <Text style={styles.addActivityTitle}>Créer un petit moment</Text>
-              <Text style={styles.activityDetail}>Choisis son image, son icône et sa durée.</Text>
+              <Text style={styles.addActivityTitle}>
+                {isPremium ? 'Créer un petit moment' : 'Créer un petit moment · Premium'}
+              </Text>
+              <Text style={styles.activityDetail}>
+                {isPremium
+                  ? 'Choisis son image, son icône et sa durée.'
+                  : 'Débloque la création de tes activités personnalisées.'}
+              </Text>
             </View>
             <Text style={styles.actionArrow}>›</Text>
           </Pressable>
@@ -943,7 +1249,7 @@ export default function Dashboard() {
                 .filter((idea) => idea.title === selectedActivityIdea)
                 .map((idea) => (
                   <View key={idea.title} style={styles.suggestionSection}>
-                    <Text style={styles.activityFormLabel}>Choisis les tâches à placer dans cette fiche</Text>
+                    <Text style={styles.activityFormLabel}>Choisis les petits pas à placer dans cette fiche</Text>
                     <View style={styles.suggestionList}>
                       {idea.suggestions.map((suggestion) => (
                         <Pressable
@@ -980,7 +1286,7 @@ export default function Dashboard() {
                     <Text style={styles.activityFormHint}>
                       {selectedActivityTasks.length
                         ? `${selectedActivityTasks.length} tâche${selectedActivityTasks.length > 1 ? 's' : ''} dans ta fiche.`
-                        : 'Tu pourras aussi ajouter tes propres tâches dans la fiche.'}
+                        : 'Tu pourras aussi ajouter tes propres petits pas dans la fiche.'}
                     </Text>
                   </View>
                 ))}
@@ -1142,7 +1448,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   brandMark: {
     color: palette.textPrimary,
     fontSize: 28,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '700',
     letterSpacing: -1,
   },
@@ -1177,7 +1483,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     color: palette.textPrimary,
     fontSize: 25,
     lineHeight: 32,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     marginBottom: spacing.md,
   },
   heroCard: {
@@ -1209,10 +1515,21 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontWeight: '600',
   },
   focusCard: {
+    position: 'relative',
     backgroundColor: palette.sagePale,
     borderRadius: borderRadius.medium,
     padding: spacing.md,
     marginBottom: spacing.lg,
+    overflow: 'hidden',
+  },
+  focusIllustration: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 76,
+    height: 76,
+    borderRadius: borderRadius.small,
+    opacity: 0.94,
   },
   focusIcon: {
     position: 'absolute',
@@ -1231,6 +1548,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   },
   focusCopy: {
     paddingLeft: 44,
+    paddingRight: 82,
     marginBottom: spacing.md,
   },
   eyebrow: {
@@ -1243,8 +1561,14 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   focusTitle: {
     color: palette.textPrimary,
     fontSize: 15,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
+  },
+  contextualDescription: {
+    color: palette.textSecondary,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 4,
   },
   focusAction: {
     backgroundColor: palette.sage,
@@ -1259,6 +1583,86 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     color: palette.surface,
     fontSize: 12,
     fontWeight: '600',
+  },
+  intentionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginTop: -spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.medium,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  intentionIcon: {
+    color: palette.clay,
+    fontSize: 20,
+  },
+  intentionCopy: {
+    flex: 1,
+  },
+  intentionLabel: {
+    color: palette.sage,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+  },
+  intentionText: {
+    color: palette.textPrimary,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  contextualStepsCard: {
+    padding: spacing.md,
+    marginTop: -spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.medium,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  contextualStepsHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  contextualStepsTitle: {
+    flex: 1,
+    color: palette.textPrimary,
+    fontSize: 12,
+    fontFamily: typography.fonts.display,
+    fontWeight: '600',
+  },
+  contextualStepsCount: {
+    color: palette.sage,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  contextualStepRow: {
+    minHeight: 26,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  contextualStepDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: palette.sage,
+  },
+  contextualStepText: {
+    flex: 1,
+    color: palette.textSecondary,
+    fontSize: 10,
+  },
+  contextualStepsHint: {
+    color: palette.textSecondary,
+    fontSize: 10,
+    lineHeight: 15,
   },
   hydrationCard: {
     padding: spacing.md,
@@ -1286,7 +1690,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   hydrationTitle: {
     color: palette.textPrimary,
     fontSize: 16,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
   },
   hydrationIcon: {
@@ -1377,7 +1781,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   sectionTitle: {
     color: palette.textPrimary,
     fontSize: 18,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
   },
   sectionSubtitle: {
@@ -1464,7 +1868,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   activityTitle: {
     color: palette.textPrimary,
     fontSize: 14,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
   },
   activityDetail: {
@@ -1650,7 +2054,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   reassurance: {
     color: palette.textSecondary,
     fontSize: 11,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: spacing.md,
@@ -1992,7 +2396,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   modalTitle: {
     color: palette.textPrimary,
     fontSize: 23,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: spacing.xs,

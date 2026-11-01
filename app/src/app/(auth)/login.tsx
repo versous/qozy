@@ -273,7 +273,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     color: palette.textPrimary,
     fontSize: 44,
     lineHeight: 52,
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
     fontWeight: '700',
     marginBottom: spacing.sm,
   },
@@ -282,7 +282,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: palette.textPrimary,
     textAlign: 'center',
-    fontFamily: 'serif',
+    fontFamily: typography.fonts.display,
   },
   subtitle: {
     fontSize: typography.sizes.md,

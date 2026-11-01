@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -159,12 +160,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   backButton: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginBottom: spacing.md },
   backText: { color: palette.sage, fontSize: 12, fontWeight: '600' },
   eyebrow: { color: palette.sage, fontSize: 9, fontWeight: '700', letterSpacing: 0.9 },
-  title: { color: palette.textSecondary, fontSize: 18, fontFamily: 'serif', marginTop: spacing.sm },
-  routineTitle: { color: palette.textPrimary, fontSize: 25, fontFamily: 'serif', fontWeight: '600', marginTop: 2 },
+  title: { color: palette.textSecondary, fontSize: 18, fontFamily: typography.fonts.display, marginTop: spacing.sm },
+  routineTitle: { color: palette.textPrimary, fontSize: 25, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 2 },
   subtitle: { color: palette.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 5, marginBottom: spacing.lg },
   lockedCard: { alignItems: 'center', padding: spacing.lg, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   lockedIcon: { color: palette.sage, fontSize: 25, marginBottom: spacing.sm },
-  cardTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: 'serif', fontWeight: '600', textAlign: 'center' },
+  cardTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600', textAlign: 'center' },
   bodyText: { color: palette.textSecondary, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: spacing.xs },
   primaryButton: { alignItems: 'center', justifyContent: 'center', minHeight: 42, paddingHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
   primaryButtonText: { color: palette.surface, fontSize: 11, fontWeight: '700' },

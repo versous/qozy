@@ -43,7 +43,12 @@ export function OfflineSyncProvider({ children }: React.PropsWithChildren) {
     () => defaultStatus
   );
 
-  const message = status.error;
+  const message = status.error
+    ?? (status.isOnline === false
+      ? 'Mode hors ligne : tes changements seront synchronisés au retour de la connexion.'
+      : status.pendingWrites > 0
+        ? `${status.pendingWrites} modification${status.pendingWrites > 1 ? 's' : ''} en attente de synchronisation.`
+        : null);
 
   return (
     <View style={styles.container}>

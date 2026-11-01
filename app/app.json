@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "app",
     "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "assets/audio/*"
+    ],
     "ios": {
       "bundleIdentifier": "com.versous.qozy",
       "icon": "./assets/expo.icon"

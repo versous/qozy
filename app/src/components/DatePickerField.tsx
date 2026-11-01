@@ -1,3 +1,4 @@
+import { typography } from '@/theme/typography';
 import React, { useCallback, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -194,7 +195,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(0,0,0,0.42)' },
   modal: { padding: spacing.md, borderRadius: borderRadius.large, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border },
   modalEyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 1, fontWeight: '700' },
-  modalTitle: { color: palette.textPrimary, fontSize: 20, fontFamily: 'serif', fontWeight: '600', marginTop: 4 },
+  modalTitle: { color: palette.textPrimary, fontSize: 20, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 4 },
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
   monthArrow: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.surface },
   monthArrowText: { color: palette.sage, fontSize: 25, lineHeight: 28 },

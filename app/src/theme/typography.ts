@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
 
-const roundedFont = Platform.select({
-  ios: 'Avenir Next',
-  android: 'sans-serif-rounded',
-  web: 'Avenir Next, system-ui, sans-serif',
-  default: 'System',
+const displayFont = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  web: 'Georgia, serif',
+  default: 'serif',
 }) ?? 'System';
 
 export const typography = {
@@ -12,7 +12,7 @@ export const typography = {
     regular: 'System',
     bold: 'System',
     italic: 'System',
-    display: roundedFont,
+    display: displayFont,
   },
   sizes: {
     xs: 12,

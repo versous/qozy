@@ -14,6 +14,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const isFocusScreen = ['(main)/focus', '(main)/meditation-session'].includes(segments.join('/'));
+  const isImmersiveSession = isFocusScreen;
   const [initialized, setInitialized] = useState(auth === null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -65,7 +66,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <OfflineSyncProvider>
+      <OfflineSyncProvider showStatusBanner={!isImmersiveSession}>
         <PremiumProvider>
           <MusicProvider enabled={initialized}>
             <Stack screenOptions={{ headerShown: false }} />

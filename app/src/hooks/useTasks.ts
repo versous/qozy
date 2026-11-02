@@ -20,12 +20,16 @@ import {
 } from '@/services/offlineStore';
 
 export type TaskPriority = 'urgent' | 'important' | 'normal';
+export type TaskStatus = 'todo' | 'in_progress' | 'completed';
 
 export interface TodoTask {
   id: string;
   title: string;
   description: string;
+  category?: string;
+  project?: string;
   priority: TaskPriority;
+  status?: TaskStatus;
   dueDate: string | null;
   startTime?: string | null;
   durationMinutes?: number | null;
@@ -37,11 +41,16 @@ export interface TodoTask {
 }
 
 type TaskInput = Pick<TodoTask, 'title' | 'description' | 'priority' | 'dueDate'>
-  & Pick<TodoTask, 'startTime'>;
+  & Partial<Pick<TodoTask, 'category' | 'project' | 'status' | 'startTime' | 'durationMinutes'>>;
 
 function normalizeTask(task: TodoTask): TodoTask {
+  const status: TaskStatus = task.status === 'todo' || task.status === 'in_progress' || task.status === 'completed'
+    ? task.status
+    : task.completed ? 'completed' : 'todo';
   return {
     ...task,
+    status,
+    completed: status === 'completed',
     completedDate: task.completedDate ?? null,
     completedDates: Array.isArray(task.completedDates) ? task.completedDates : [],
   };
@@ -131,14 +140,33 @@ export function useTasks() {
     }
 
     const existingTask = taskId ? tasks.find((task) => task.id === taskId) : undefined;
+    const status = input.status ?? existingTask?.status ?? (existingTask?.completed ? 'completed' : 'todo');
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const completedDates = existingTask?.completedDates ?? [];
+    const wasCompleted = existingTask?.status === 'completed' || existingTask?.completed === true;
+    const completedDate = status === 'completed'
+      ? existingTask?.completedDate ?? todayKey
+      : null;
+    const nextCompletedDates = status === 'completed'
+      ? wasCompleted ? completedDates : [...new Set([...completedDates, todayKey])]
+      : wasCompleted && existingTask?.completedDate
+        ? completedDates.filter((date) => date !== existingTask.completedDate)
+        : completedDates;
     const taskData = {
       title,
       description: input.description.trim(),
+      category: input.category ?? existingTask?.category ?? 'Études',
+      project: (input.project ?? existingTask?.project ?? '').trim(),
       priority: input.priority,
+      status,
+      completed: status === 'completed',
+      completedDate,
+      completedDates: nextCompletedDates,
       dueDate: input.dueDate,
       startTime: input.startTime ?? null,
       durationMinutes: input.startTime
-        ? existingTask?.durationMinutes ?? 60
+        ? input.durationMinutes ?? existingTask?.durationMinutes ?? 60
         : null,
       userId,
     };
@@ -155,12 +183,9 @@ export function useTasks() {
       data: taskId
         ? taskData
         : {
-          ...taskData,
-          completed: false,
-          completedDate: null,
-          completedDates: [],
-          createdAt: Timestamp.now(),
-        },
+        ...taskData,
+        createdAt: Timestamp.now(),
+      },
     }, userId);
 
     setTasks((currentTasks) => sortTasks(applyPendingWrites(
@@ -187,6 +212,7 @@ export function useTasks() {
       kind: 'update',
       data: {
         completed: !task.completed,
+        status: task.completed ? 'todo' : 'completed',
         completedDate: task.completed ? null : todayKey,
         completedDates: nextCompletedDates,
       },

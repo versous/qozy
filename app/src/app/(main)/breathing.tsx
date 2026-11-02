@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { useMusic } from '@/services/MusicProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
@@ -32,10 +33,7 @@ export default function BreathingScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
           <Text style={styles.backText}>‹  Aujourd’hui</Text>
         </Pressable>
-        <View style={styles.brandLine}>
-          <Text style={styles.brand}>nid</Text>
-          <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-        </View>
+        <BrandHeader />
         <Text style={styles.eyebrow}>UNE PAUSE POUR TOI</Text>
         <Text style={styles.title}>{activity}</Text>
         <Text style={styles.subtitle}>Rien à réussir. Juste être là.</Text>

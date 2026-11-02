@@ -23,6 +23,7 @@ export interface HydrationEntry {
   date: string;
   milliliters: number;
   createdAt: number;
+  container?: string;
 }
 
 function getDateKey(date: Date) {
@@ -62,6 +63,7 @@ function normalizeEntries(value: unknown): HydrationEntry[] {
     && entry.milliliters > 0
     && typeof entry.createdAt === 'number'
     && Number.isFinite(entry.createdAt)
+    && (entry.container === undefined || typeof entry.container === 'string')
   ));
 }
 
@@ -126,6 +128,7 @@ function updateEntries(
             date: entry.date,
             milliliters: entry.milliliters,
             createdAt: entry.createdAt,
+            ...(entry.container ? { container: entry.container } : {}),
           },
         }, userId)),
       ...currentEntries
@@ -150,9 +153,38 @@ export function useHydration() {
   const [entries, setEntries] = useState<HydrationEntry[]>([]);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dailyGoalMilliliters, setDailyGoalMilliliters] = useState(DAILY_GOAL_MILLILITERS);
+  const [loadedGoalUserId, setLoadedGoalUserId] = useState<string | null>(null);
   const storageKey = userId ? getStorageKey(userId) : null;
   const queryKey = storageKey ? `${storageKey}:${today}` : null;
   const isLoaded = Boolean(queryKey && loadedKey === queryKey);
+  const isGoalLoaded = Boolean(userId && loadedGoalUserId === userId);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let active = true;
+    void AsyncStorage.getItem(`qozy-hydration-goal:${userId}`).then((storedGoal) => {
+      if (!active) return;
+      const goal = Number(storedGoal);
+      setDailyGoalMilliliters(
+        Number.isInteger(goal) && goal >= 250 && goal <= 10000
+          ? goal
+          : DAILY_GOAL_MILLILITERS
+      );
+      setLoadedGoalUserId(userId);
+    }).catch((reason: unknown) => {
+      if (!active) return;
+      setError(reason instanceof Error
+        ? `Impossible de lire ton repère d’hydratation : ${reason.message}`
+        : 'Impossible de lire ton repère d’hydratation.');
+      setLoadedGoalUserId(userId);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     const now = new Date();
@@ -225,6 +257,7 @@ export function useHydration() {
                   date: entry.date,
                   milliliters: entry.milliliters,
                   createdAt: entry.createdAt,
+                  ...(entry.container ? { container: entry.container } : {}),
                 },
               }, userId)));
               await AsyncStorage.setItem(migrationKey, 'true');
@@ -289,7 +322,7 @@ export function useHydration() {
     setError(null);
   };
 
-  const addWater = async (milliliters: number) => {
+  const addWater = async (milliliters: number, container?: string) => {
     if (!Number.isInteger(milliliters) || milliliters < 50 || milliliters > 5000) {
       throw new Error('Choisis une quantité comprise entre 50 et 5 000 ml.');
     }
@@ -304,6 +337,7 @@ export function useHydration() {
         date: getDateKey(new Date(now)),
         milliliters,
         createdAt: now,
+        ...(container ? { container } : {}),
       },
     ]);
   };
@@ -319,6 +353,26 @@ export function useHydration() {
     });
   };
 
+  const removeEntry = async (entryId: string) => {
+    if (selectedDate !== today) {
+      throw new Error('Tu peux modifier uniquement les prises d’aujourd’hui.');
+    }
+    await saveEntries((currentEntries) =>
+      currentEntries.filter((entry) => entry.id !== entryId)
+    );
+  };
+
+  const saveDailyGoal = async (milliliters: number) => {
+    if (!Number.isInteger(milliliters) || milliliters < 250 || milliliters > 10000) {
+      throw new Error('Choisis un repère compris entre 250 et 10 000 ml.');
+    }
+    if (!userId || !isGoalLoaded) {
+      throw new Error('Ton repère est encore en cours de chargement.');
+    }
+    await AsyncStorage.setItem(`qozy-hydration-goal:${userId}`, String(milliliters));
+    setDailyGoalMilliliters(milliliters);
+  };
+
   return {
     today,
     selectedDate,
@@ -327,7 +381,10 @@ export function useHydration() {
     selectedEntries: isLoaded ? selectedEntries : [],
     milliliters: isLoaded ? (selectedDate === today ? todayMilliliters : selectedMilliliters) : 0,
     todayMilliliters: isLoaded ? todayMilliliters : 0,
-    dailyGoalMilliliters: DAILY_GOAL_MILLILITERS,
+    dailyGoalMilliliters: isGoalLoaded ? dailyGoalMilliliters : DAILY_GOAL_MILLILITERS,
+    goalLoading: Boolean(userId && !isGoalLoaded),
+    saveDailyGoal,
+    removeEntry,
     dailyTotals: isLoaded ? dailyTotals : new Map<string, number>(),
     loading: Boolean(queryKey && !isLoaded),
     error,

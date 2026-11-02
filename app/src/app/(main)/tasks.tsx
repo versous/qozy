@@ -15,15 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
-import { DatePickerField } from '@/components/DatePickerField';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
-import { TimePickerField } from '@/components/TimePickerField';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { ALL_HABIT_DAYS, type Habit, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
-import { TaskPriority, TodoTask, useTasks } from '@/hooks/useTasks';
+import { type TodoTask, useTasks } from '@/hooks/useTasks';
 import { spacing, borderRadius, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -35,18 +34,6 @@ const filters: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Toutes' },
 ];
 const todayLabel = new Date().toLocaleDateString('fr-FR', { weekday: 'long' }).toLocaleUpperCase('fr-FR');
-const priorities: { value: TaskPriority; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'important', label: 'Important' },
-  { value: 'normal', label: 'Normal' },
-];
-
-const isValidDate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-};
-
 export default function TasksScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
@@ -55,7 +42,6 @@ export default function TasksScreen() {
     tasks,
     loading: tasksLoading,
     error: tasksError,
-    saveTask,
     toggleTask,
     deleteTask,
   } = useTasks();
@@ -69,34 +55,13 @@ export default function TasksScreen() {
   const [habitGoalUnit, setHabitGoalUnit] = useState('pages');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const dismissHabitSheet = useCallback(() => setIsAdding(false), [setIsAdding]);
-  const dismissTaskSheet = useCallback(() => setIsTaskModalVisible(false), [setIsTaskModalVisible]);
-  const [editingTask, setEditingTask] = useState<TodoTask | null>(null);
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
-  const [taskDueDate, setTaskDueDate] = useState('');
-  const [taskStartTime, setTaskStartTime] = useState<string | null>(null);
-  const [taskPriority, setTaskPriority] = useState<TaskPriority>('normal');
-  const [taskError, setTaskError] = useState('');
-  const [savingTask, setSavingTask] = useState(false);
   const pending = habits.filter((habit) => !habit.isCompleted);
   const completed = habits.filter((habit) => habit.isCompleted);
   const visibleHabits = filter === 'active' ? pending : filter === 'done' ? completed : habits;
   const otherHabits = allHabits.filter((habit) => !habits.some((todayHabit) => todayHabit.id === habit.id));
   const pendingTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
-
-  const openTaskModal = (task?: TodoTask) => {
-    setEditingTask(task ?? null);
-    setTaskTitle(task?.title ?? '');
-    setTaskDescription(task?.description ?? '');
-    setTaskDueDate(task?.dueDate ?? '');
-    setTaskStartTime(task?.startTime ?? null);
-    setTaskPriority(task?.priority ?? 'normal');
-    setTaskError('');
-    setIsTaskModalVisible(true);
-  };
 
   const openHabitModal = (habit?: Habit) => {
     setEditingHabit(habit ?? null);
@@ -107,31 +72,6 @@ export default function TasksScreen() {
     setHabitGoalUnit(habit?.goalUnit ?? 'pages');
     setSaveError('');
     setIsAdding(true);
-  };
-
-  const handleSaveTask = async () => {
-    const dueDate = taskDueDate.trim();
-    if (dueDate && !isValidDate(dueDate)) {
-      setTaskError('Saisis une date valide au format AAAA-MM-JJ.');
-      return;
-    }
-
-    setSavingTask(true);
-    setTaskError('');
-    try {
-      await saveTask({
-        title: taskTitle,
-        description: taskDescription,
-        priority: taskPriority,
-        dueDate: dueDate || null,
-        startTime: taskStartTime,
-      }, editingTask?.id);
-      setIsTaskModalVisible(false);
-    } catch (reason) {
-      setTaskError(reason instanceof Error ? reason.message : 'Impossible d’enregistrer cette tâche.');
-    } finally {
-      setSavingTask(false);
-    }
   };
 
   const confirmDeleteTask = (task: TodoTask) => {
@@ -184,10 +124,18 @@ export default function TasksScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.brandLine}>
-          <Text style={styles.brand}>nid</Text>
-          <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-        </View>
+        <BrandHeader
+          trailing={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir le calendrier"
+              onPress={() => router.push('/calendar' as Href)}
+              style={styles.calendarShortcut}>
+              <Text style={styles.calendarShortcutIcon}>▦</Text>
+              <Text style={styles.calendarShortcutText}>Calendrier</Text>
+            </Pressable>
+          }
+        />
         <Text style={styles.eyebrow}>{todayLabel} · MES PETITS PAS</Text>
         <Text style={styles.title}>Ma journée</Text>
         <Text style={styles.subtitle}>Mes petits pas et mes habitudes, sans pression.</Text>
@@ -224,7 +172,7 @@ export default function TasksScreen() {
           <Text style={styles.sectionCount}>{pendingTasks.length} à faire</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => openTaskModal()}
+            onPress={() => router.push('/task-editor' as Href)}
             style={styles.addTaskChip}>
             <Text style={styles.addTaskText}>＋ Ajouter</Text>
           </Pressable>
@@ -277,7 +225,10 @@ export default function TasksScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Modifier ${task.title}`}
-                    onPress={() => openTaskModal(task)}
+                    onPress={() => router.push({
+                      pathname: '/task-editor',
+                      params: { taskId: task.id },
+                    } as Href)}
                     hitSlop={8}>
                     <Text style={styles.todoAction}>✎</Text>
                   </Pressable>
@@ -298,7 +249,7 @@ export default function TasksScreen() {
             ) : null}
           </View>
         ) : (
-          <Pressable onPress={() => openTaskModal()} style={styles.emptyCard}>
+          <Pressable onPress={() => router.push('/task-editor' as Href)} style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Aucune tâche pour le moment</Text>
             <Text style={styles.emptyText}>Ajoute la première, puis avance à ton rythme.</Text>
           </Pressable>
@@ -467,7 +418,7 @@ export default function TasksScreen() {
 
         <CosyButton
           title="+  Ajouter un petit pas"
-          onPress={() => openHabitModal()}
+          onPress={() => router.push('/task-editor' as Href)}
           style={styles.addButton}
         />
       </ScrollView>
@@ -517,75 +468,6 @@ export default function TasksScreen() {
         </View>
       </Modal>
 
-      <Modal
-        visible={isTaskModalVisible}
-        transparent
-        animationType="none"
-        onRequestClose={dismissTaskSheet}>
-        <View style={styles.modalBackdrop}>
-          <SwipeDismissSheet visible={isTaskModalVisible} onDismiss={dismissTaskSheet} style={styles.modal}>
-            <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
-            <Text style={styles.modalTitle}>{editingTask ? 'Modifier ma tâche' : 'Nouvelle tâche'}</Text>
-            <TextInput
-              value={taskTitle}
-              onChangeText={setTaskTitle}
-              placeholder="Que souhaites-tu faire ?"
-              placeholderTextColor={colors.textLight}
-              style={styles.input}
-              editable={!savingTask}
-              maxLength={100}
-              autoFocus
-            />
-            <TextInput
-              value={taskDescription}
-              onChangeText={setTaskDescription}
-              placeholder="Description (facultative)"
-              placeholderTextColor={colors.textLight}
-              style={[styles.input, styles.descriptionInput]}
-              editable={!savingTask}
-              multiline
-              maxLength={500}
-            />
-            <Text style={styles.formLabel}>Priorité</Text>
-            <View style={styles.priorityOptions}>
-              {priorities.map((priority) => {
-                const selected = taskPriority === priority.value;
-                return (
-                  <Pressable
-                    key={priority.value}
-                    onPress={() => setTaskPriority(priority.value)}
-                    style={[styles.priorityOption, selected && styles.priorityOptionSelected]}>
-                    <Text style={[styles.priorityOptionText, selected && styles.priorityOptionTextSelected]}>
-                      {priority.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <DatePickerField
-              value={taskDueDate || null}
-              onChange={(date) => setTaskDueDate(date ?? '')}
-              disabled={savingTask}
-              placeholder="Choisir une date (facultatif)"
-            />
-            <TimePickerField
-              value={taskStartTime}
-              onChange={setTaskStartTime}
-              disabled={savingTask}
-            />
-            {taskError ? <Text style={styles.error}>{taskError}</Text> : null}
-            <CosyButton
-              title={savingTask ? 'Enregistrement…' : editingTask ? 'Enregistrer' : 'Ajouter à ma journée'}
-              onPress={() => void handleSaveTask()}
-              disabled={savingTask || !taskTitle.trim()}
-              style={styles.modalAction}
-            />
-            <Pressable onPress={() => setIsTaskModalVisible(false)} style={styles.cancel}>
-              <Text style={styles.cancelText}>Pas maintenant</Text>
-            </Pressable>
-          </SwipeDismissSheet>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -593,6 +475,9 @@ export default function TasksScreen() {
 const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.lg },
+  calendarShortcut: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  calendarShortcutIcon: { color: palette.sage, fontSize: 14 },
+  calendarShortcutText: { color: palette.sage, fontSize: 9, fontWeight: '700' },
   brandLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.lg },
   brand: { color: palette.textPrimary, fontSize: 27, fontFamily: typography.fonts.display, fontWeight: '700' },
   brandCaption: { color: palette.textSecondary, fontSize: 8, letterSpacing: 1, fontWeight: '600' },

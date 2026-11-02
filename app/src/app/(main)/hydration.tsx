@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,20 +13,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { useHydration } from '@/hooks/useHydration';
 import { usePremium } from '@/services/PremiumProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
-
-const CUP_SIZES = [
-  { milliliters: 100, label: 'Petit verre', shape: 'shot' as const },
-  { milliliters: 150, label: 'Tasse', shape: 'mug' as const },
-  { milliliters: 200, label: 'Verre', shape: 'glass' as const },
-  { milliliters: 300, label: 'Grand verre', shape: 'tumbler' as const },
-  { milliliters: 500, label: 'Gourde', shape: 'bottle' as const },
-];
 
 const BENEFITS = [
   {
@@ -43,6 +38,15 @@ const BENEFITS = [
     title: 'Écoute tes besoins',
     detail: 'Les besoins varient selon les personnes, l’activité, la météo, l’alimentation et la santé. Ton repère n’est pas une obligation.',
   },
+];
+
+const WATER_CONTAINERS = [
+  { name: 'Petit verre', amount: 150, icon: '🥃' },
+  { name: 'Verre', amount: 250, icon: '🥛' },
+  { name: 'Grand verre', amount: 350, icon: '🥤' },
+  { name: 'Mug', amount: 300, icon: '☕' },
+  { name: 'Gourde', amount: 500, icon: '🧴' },
+  { name: 'Bouteille', amount: 750, icon: '🚰' },
 ];
 
 function getDateKey(date: Date) {
@@ -94,11 +98,13 @@ export default function HydrationScreen() {
   const hydration = useHydration();
   const [isAddingWater, setIsAddingWater] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const [isAmountModalVisible, setIsAmountModalVisible] = useState(false);
+  const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
+  const [goalInput, setGoalInput] = useState(String(hydration.dailyGoalMilliliters));
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
   const dateObject = new Date(`${hydration.selectedDate}T12:00:00`);
   const currentTotal = hydration.milliliters;
-  const progress = Math.min(100, Math.round(
-    (currentTotal / hydration.dailyGoalMilliliters) * 100
-  ));
+  const progress = Math.min(100, Math.round((currentTotal / hydration.dailyGoalMilliliters) * 100));
   const remaining = Math.max(0, hydration.dailyGoalMilliliters - currentTotal);
   const weekDays = useMemo(() => getWeekDays(hydration.today), [hydration.today]);
   const weekMax = Math.max(
@@ -119,10 +125,10 @@ export default function HydrationScreen() {
     hydration.setSelectedDate(nextDateKey);
   };
 
-  const addWater = async (milliliters: number): Promise<boolean> => {
+  const addWater = async (milliliters: number, container?: string): Promise<boolean> => {
     setIsAddingWater(true);
     try {
-      await hydration.addWater(milliliters);
+      await hydration.addWater(milliliters, container);
       return true;
     } catch (reason) {
       Alert.alert(
@@ -134,192 +140,199 @@ export default function HydrationScreen() {
       setIsAddingWater(false);
     }
   };
-  const addCustomWater = () => {
-    const amount = Number(customAmount);
-    if (!/^\d+$/.test(customAmount) || amount < 50 || amount > 5000) {
-      Alert.alert('Quantité à vérifier', 'Entre une quantité comprise entre 50 et 5 000 ml.');
+  const removeEntry = (entryId: string) => {
+    void hydration.removeEntry(entryId).catch((reason: unknown) => {
+      Alert.alert(
+        'Suppression impossible',
+        reason instanceof Error ? reason.message : 'Réessaie plus tard.'
+      );
+    });
+  };
+  const saveDailyGoal = async () => {
+    const goal = Number(goalInput);
+    if (!/^\d+$/.test(goalInput) || goal < 250 || goal > 10000) {
+      Alert.alert('Repère à vérifier', 'Entre un repère compris entre 250 et 10 000 ml.');
       return;
     }
-    void addWater(amount).then((saved) => {
-      if (saved) setCustomAmount('');
-    });
+    setIsSavingGoal(true);
+    try {
+      await hydration.saveDailyGoal(goal);
+      setIsGoalModalVisible(false);
+    } catch (reason) {
+      Alert.alert('Modification impossible', reason instanceof Error ? reason.message : 'Réessaie plus tard.');
+    } finally {
+      setIsSavingGoal(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹  Aujourd’hui</Text>
-        </Pressable>
-        <Text style={styles.eyebrow}>À TON RYTHME</Text>
-        <Text style={styles.title}>Mon hydratation</Text>
-        <Text style={styles.subtitle}>Un petit verre à la fois, sans pression.</Text>
+        <BrandHeader />
+        <View style={styles.titleRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Jour précédent"
+            disabled={!isPremium}
+            onPress={() => changeDate(-1)}
+            style={[styles.backButton, !isPremium && styles.disabledControl]}>
+            <Text style={styles.backText}>‹  Aujourd’hui</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.title}>Une gorgée à la fois</Text>
+        <View style={styles.dateSubtitleRow}>
+          <Text style={styles.subtitle}>
+            {formatDateLabel(hydration.selectedDate, hydration.today)} · Mon journal d’eau
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Jour suivant"
+            disabled={isToday}
+            onPress={() => changeDate(1)}
+            style={[styles.nextDateButton, isToday && styles.disabledControl]}>
+            <Text style={styles.dateArrowText}>›</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.progressCard}>
           <View
             accessibilityRole="progressbar"
-            accessibilityLabel={`Hydratation ${formatLiters(currentTotal)} sur ${formatLiters(hydration.dailyGoalMilliliters)}`}
+            accessibilityLabel={`Hydratation ${currentTotal} millilitres sur ${hydration.dailyGoalMilliliters} millilitres`}
             accessibilityValue={{ min: 0, max: 100, now: progress }}
             style={styles.progressRing}>
-            {Array.from({ length: 56 }, (_, index) => {
-              const angle = (index / 56) * Math.PI * 2 - Math.PI / 2;
-              const left = 96 + Math.cos(angle) * 83 - 3;
-              const top = 96 + Math.sin(angle) * 83 - 3;
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.progressDot,
-                    {
-                      left,
-                      top,
-                      backgroundColor: index < Math.round(progress * 0.56)
-                        ? colors.sage
-                        : colors.sagePale,
-                    },
-                  ]}
-                />
-              );
-            })}
+            <Svg width={176} height={176} viewBox="0 0 176 176" style={styles.progressSvg}>
+              <Circle
+                cx={88}
+                cy={88}
+                r={68}
+                fill="none"
+                stroke={colors.border}
+                strokeWidth={7}
+              />
+              <Circle
+                cx={88}
+                cy={88}
+                r={68}
+                fill="none"
+                stroke={colors.sage}
+                strokeWidth={7}
+                strokeLinecap="butt"
+                strokeDasharray={`${2 * Math.PI * 68} ${2 * Math.PI * 68}`}
+                strokeDashoffset={2 * Math.PI * 68 * (1 - progress / 100)}
+                rotation={-90}
+                origin="88, 88"
+              />
+            </Svg>
             <View style={styles.ringCenter}>
-              <Text style={styles.ringIcon}>◉</Text>
-              <Text style={styles.ringAmount}>{formatLiters(currentTotal)}</Text>
-              <Text style={styles.ringGoal}>sur {formatLiters(hydration.dailyGoalMilliliters)}</Text>
+              <Text style={styles.ringAmount}>{currentTotal.toLocaleString('fr-FR')} ml</Text>
+              <Text style={styles.ringGoal}>sur {hydration.dailyGoalMilliliters.toLocaleString('fr-FR')} ml</Text>
             </View>
           </View>
-          <View style={styles.dateSelector}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Jour précédent"
-              disabled={!isPremium}
-              onPress={() => changeDate(-1)}
-              style={[styles.dateArrow, !isPremium && styles.disabledControl]}>
-              <Text style={styles.dateArrowText}>‹</Text>
-            </Pressable>
-            <View style={styles.dateLabelWrap}>
-              <Text style={styles.dateLabel}>
-                {formatDateLabel(hydration.selectedDate, hydration.today)}
-              </Text>
-              <Text style={styles.dateHint}>{isToday ? 'Ton suivi du jour' : 'Consultation de l’historique'}</Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Jour suivant"
-              disabled={isToday}
-              onPress={() => changeDate(1)}
-              style={[styles.dateArrow, isToday && styles.disabledControl]}>
-              <Text style={styles.dateArrowText}>›</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.remainingText}>
+          <Text style={styles.progressSummary}>
             {hydration.loading
-              ? 'On prépare ton suivi…'
-              : !isPremium
-                ? 'L’historique des jours précédents est disponible avec Premium.'
-              : remaining > 0
-                ? `Encore ${formatLiters(remaining)} pour atteindre ton repère indicatif.`
-                : 'Ton repère indicatif est atteint. À ton rythme.'}
+              ? 'On prépare ton journal d’eau…'
+              : `${progress} % de ton repère${remaining ? ` · encore ${remaining.toLocaleString('fr-FR')} ml` : ' · repère atteint'}`}
           </Text>
+          <Text style={styles.progressHint}>Chaque petit verre compte.</Text>
         </View>
 
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionTitle}>Ajouter un verre</Text>
-            <Text style={styles.sectionSubtitle}>Choisis la taille qui te convient.</Text>
+            <Text style={styles.sectionTitle}>Choisis ton contenant</Text>
+            <Text style={styles.sectionSubtitle}>{currentTotal.toLocaleString('fr-FR')} ml au total</Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ajouter une prise d’eau"
+            disabled={!isToday || hydration.loading || isAddingWater}
+            onPress={() => {
+              setCustomAmount('');
+              setIsAmountModalVisible(true);
+            }}
+            style={[styles.addWaterButton, (!isToday || hydration.loading || isAddingWater) && styles.disabledControl]}>
+            <Text style={styles.addWaterButtonText}>＋ Ajouter</Text>
+          </Pressable>
         </View>
-        <View style={styles.cupGrid}>
-          {CUP_SIZES.map((cup) => (
+        <View style={styles.containerGrid}>
+          {WATER_CONTAINERS.map((container) => (
             <Pressable
-              key={cup.milliliters}
+              key={container.name}
               accessibilityRole="button"
-              accessibilityLabel={`Ajouter une prise de ${cup.milliliters} millilitres`}
+              accessibilityLabel={`Ajouter ${container.name}, ${container.amount} millilitres`}
               disabled={!isToday || hydration.loading || isAddingWater}
-              onPress={() => void addWater(cup.milliliters)}
+              onPress={() => void addWater(container.amount, container.name)}
               style={[
-                styles.cupButton,
-                !isToday && styles.disabledControl,
-                isToday && !isAddingWater && styles.cupButtonActive,
+                styles.containerCard,
+                (!isToday || hydration.loading || isAddingWater) && styles.disabledControl,
               ]}>
-              <CupIllustration shape={cup.shape} styles={styles} />
-              <Text style={styles.cupAmount}>{cup.milliliters} ml</Text>
-              <Text style={styles.cupLabel}>{cup.label}</Text>
+              <Text style={styles.containerIcon}>{container.icon}</Text>
+              <Text style={styles.containerName}>{container.name}</Text>
+              <Text style={styles.containerAmount}>{container.amount} ml</Text>
             </Pressable>
           ))}
         </View>
-        <View style={styles.customAmountCard}>
-          <View style={styles.customAmountCopy}>
-            <Text style={styles.customAmountTitle}>Une autre quantité ?</Text>
-            <Text style={styles.customAmountHint}>Entre ton volume en millilitres (50 à 5 000 ml).</Text>
-          </View>
-          <View style={styles.customAmountControls}>
-            <TextInput
-              accessibilityLabel="Quantité d’eau personnalisée en millilitres"
-              value={customAmount}
-              onChangeText={(value) => setCustomAmount(value.replace(/[^\d]/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              placeholder="Ex. 350"
-              placeholderTextColor={colors.textLight}
-              maxLength={4}
-              style={styles.customAmountInput}
-            />
-            <Text style={styles.customAmountUnit}>ml</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter la quantité personnalisée"
-              disabled={!isToday || hydration.loading || isAddingWater || !customAmount}
-              onPress={addCustomWater}
-              style={[styles.customAmountButton, (!isToday || hydration.loading || isAddingWater || !customAmount) && styles.disabledControl]}>
-              <Text style={styles.customAmountButtonText}>Ajouter</Text>
-            </Pressable>
-          </View>
-        </View>
-        <Text style={styles.guidanceNote}>
-          Le repère de 2 L est indicatif, pas un objectif médical : les besoins en eau diffèrent selon chacun.
-        </Text>
-
+        <Text style={styles.containerHint}>Ou ajoute une quantité personnalisée.</Text>
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionTitle}>Les prises de la journée</Text>
-            <Text style={styles.sectionSubtitle}>{formatDateLabel(hydration.selectedDate, hydration.today)}</Text>
+            <Text style={styles.sectionTitle}>Mes prises du jour</Text>
+            <Text style={styles.sectionSubtitle}>Tu peux supprimer une prise enregistrée.</Text>
           </View>
-          {isToday && hydration.selectedEntries.length ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={hydration.loading || isAddingWater}
-              onPress={() => {
-                void hydration.undoLastEntry().catch((reason: unknown) => {
-                  Alert.alert(
-                    'Suppression impossible',
-                    reason instanceof Error ? reason.message : 'Réessaie plus tard.'
-                  );
-                });
-              }}>
-              <Text style={styles.undoText}>Annuler la dernière</Text>
-            </Pressable>
-          ) : null}
         </View>
         {hydration.loading ? (
           <ActivityIndicator color={colors.sage} style={styles.loader} />
         ) : hydration.selectedEntries.length ? (
-          hydration.selectedEntries.map((entry) => (
-            <View key={entry.id} style={styles.recordRow}>
-              <View style={styles.recordIcon}><Text style={styles.recordIconText}>◉</Text></View>
-              <View style={styles.recordCopy}>
-                <Text style={styles.recordTitle}>{formatTime(entry.createdAt)}</Text>
-                <Text style={styles.recordSubtitle}>Eau · {formatLiters(entry.milliliters)}</Text>
+          [...hydration.selectedEntries].sort((a, b) => a.createdAt - b.createdAt).map((entry) => (
+            <Pressable
+              key={entry.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Supprimer la prise de ${entry.milliliters} millilitres enregistrée à ${formatTime(entry.createdAt)}`}
+              disabled={!isToday || isAddingWater}
+              onPress={() => removeEntry(entry.id)}
+              style={[styles.recordRow, (!isToday || isAddingWater) && styles.disabledControl]}>
+              <View style={styles.recordIcon}>
+                <Svg width={18} height={18} viewBox="0 0 24 24">
+                  <Path d="M12 3.5S6.5 10 6.5 14.5a5.5 5.5 0 0 0 11 0C17.5 10 12 3.5 12 3.5Z" fill="none" stroke={colors.sage} strokeWidth={1.8} />
+                </Svg>
               </View>
+              <Text style={styles.recordTime}>{formatTime(entry.createdAt)} · {entry.container ?? 'Eau'}</Text>
               <Text style={styles.recordAmount}>{entry.milliliters} ml</Text>
-            </View>
+              <Text style={styles.recordUndo}>↶</Text>
+            </Pressable>
           ))
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Aucune prise enregistrée</Text>
-            <Text style={styles.emptyText}>Tu peux ajouter un verre quand tu le souhaites.</Text>
+            <Text style={styles.emptyTitle}>Aucun verre enregistré pour le moment.</Text>
+            <Text style={styles.emptyText}>Ajoute une gorgée quand tu en as envie.</Text>
           </View>
         )}
         {hydration.error ? <Text style={styles.errorText}>{hydration.error}</Text> : null}
+
+        <View style={styles.goalCard}>
+          <View style={styles.goalIcon}>
+            <Text style={styles.goalIconText}>☷</Text>
+          </View>
+          <View style={styles.goalCopy}>
+            <Text style={styles.goalTitle}>Mon objectif quotidien</Text>
+            <Text style={styles.goalSubtitle}>
+              {hydration.goalLoading
+                ? 'Chargement de ton repère…'
+                : `${hydration.dailyGoalMilliliters.toLocaleString('fr-FR')} ml · Personnalisable`}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={hydration.goalLoading}
+            onPress={() => {
+              setGoalInput(String(hydration.dailyGoalMilliliters));
+              setIsGoalModalVisible(true);
+            }}
+            style={[styles.goalEditButton, hydration.goalLoading && styles.disabledControl]}>
+            <Text style={styles.goalEditText}>{hydration.goalLoading ? '…' : 'Modifier'}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.guidanceNote}>
+          Ce repère est indicatif, pas un objectif médical. Tes besoins peuvent varier.
+        </Text>
 
         <View style={styles.premiumSection}>
           <View style={styles.sectionHeading}>
@@ -404,107 +417,160 @@ export default function HydrationScreen() {
         <Text style={styles.localNote}>Ton suivi est enregistré sur cet appareil.</Text>
       </ScrollView>
       <BottomNavigation active="today" />
-    </SafeAreaView>
-  );
-}
 
-function CupIllustration({
-  shape,
-  styles,
-}: {
-  shape: typeof CUP_SIZES[number]['shape'];
-  styles: ReturnType<typeof createStyles>;
-}) {
-  if (shape === 'bottle') {
-    return (
-      <View style={styles.cupIllustration}>
-        <View style={styles.cupBottleNeck} />
-        <View style={styles.cupBottleBody}>
-          <View style={[styles.cupWater, { height: '58%' }]} />
+      <Modal
+        visible={isAmountModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsAmountModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modal}>
+            <Text style={styles.modalEyebrow}>MON JOURNAL D’EAU</Text>
+            <Text style={styles.modalTitle}>Ajouter un verre</Text>
+            <Text style={styles.modalDescription}>Indique la quantité bue, entre 50 et 5 000 ml.</Text>
+            <View style={styles.customAmountControls}>
+              <TextInput
+                accessibilityLabel="Quantité d’eau en millilitres"
+                value={customAmount}
+                onChangeText={(value) => setCustomAmount(value.replace(/[^\d]/g, '').slice(0, 4))}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="Ex. 250"
+                placeholderTextColor={colors.textLight}
+                maxLength={4}
+                style={styles.customAmountInput}
+              />
+              <Text style={styles.customAmountUnit}>ml</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!customAmount || isAddingWater}
+              onPress={() => {
+                const amount = Number(customAmount);
+                if (!/^\d+$/.test(customAmount) || amount < 50 || amount > 5000) {
+                  Alert.alert('Quantité à vérifier', 'Entre une quantité comprise entre 50 et 5 000 ml.');
+                  return;
+                }
+                void addWater(amount).then((saved) => {
+                  if (saved) {
+                    setCustomAmount('');
+                    setIsAmountModalVisible(false);
+                  }
+                });
+              }}
+              style={[styles.modalPrimaryButton, (!customAmount || isAddingWater) && styles.disabledControl]}>
+              {isAddingWater
+                ? <ActivityIndicator color={colors.surface} />
+                : <Text style={styles.modalPrimaryButtonText}>Ajouter à mon journal</Text>}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsAmountModalVisible(false)}
+              style={styles.modalCancelButton}>
+              <Text style={styles.modalCancelText}>Annuler</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
-    );
-  }
+      </Modal>
 
-  const isMug = shape === 'mug';
-  const bodyStyle = shape === 'shot'
-    ? styles.cupBodySmall
-    : shape === 'tumbler'
-      ? styles.cupBodyLarge
-      : styles.cupBody;
-  const waterHeight = shape === 'shot' ? '42%' : shape === 'tumbler' ? '68%' : '55%';
-
-  return (
-    <View style={styles.cupIllustration}>
-      {isMug ? <View style={styles.cupMugHandle} /> : null}
-      <View style={bodyStyle}>
-        <View style={[styles.cupWater, { height: waterHeight }]} />
-      </View>
-    </View>
+      <Modal
+        visible={isGoalModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsGoalModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modal}>
+            <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
+            <Text style={styles.modalTitle}>Mon repère quotidien</Text>
+            <Text style={styles.modalDescription}>
+              Personnalise ton repère d’hydratation. Il reste indicatif et n’est pas un conseil médical.
+            </Text>
+            <View style={styles.customAmountControls}>
+              <TextInput
+                accessibilityLabel="Objectif quotidien en millilitres"
+                value={goalInput}
+                onChangeText={(value) => setGoalInput(value.replace(/[^\d]/g, '').slice(0, 5))}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="Ex. 2000"
+                placeholderTextColor={colors.textLight}
+                maxLength={5}
+                style={styles.customAmountInput}
+              />
+              <Text style={styles.customAmountUnit}>ml / jour</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSavingGoal || !goalInput}
+              onPress={() => void saveDailyGoal()}
+              style={[styles.modalPrimaryButton, (isSavingGoal || !goalInput) && styles.disabledControl]}>
+              {isSavingGoal
+                ? <ActivityIndicator color={colors.surface} />
+                : <Text style={styles.modalPrimaryButtonText}>Enregistrer mon repère</Text>}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsGoalModalVisible(false)}
+              style={styles.modalCancelButton}>
+              <Text style={styles.modalCancelText}>Annuler</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const createStyles = (palette: AppColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
-  backButton: { alignSelf: 'flex-start', marginBottom: spacing.md },
-  backText: { color: palette.sage, fontSize: 13, fontWeight: '600' },
-  eyebrow: { color: palette.sage, fontSize: 9, letterSpacing: 1.1, fontWeight: '700' },
-  title: { color: palette.textPrimary, fontSize: 27, lineHeight: 34, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 6 },
-  subtitle: { color: palette.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 6, marginBottom: spacing.md },
-  progressCard: { alignItems: 'center', padding: spacing.md, borderRadius: borderRadius.large, backgroundColor: palette.sagePale },
-  progressRing: { width: 192, height: 192, position: 'relative', marginVertical: spacing.xs },
-  progressDot: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
-  ringCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', borderRadius: 88, backgroundColor: palette.surface, margin: 20 },
-  ringIcon: { color: palette.sage, fontSize: 24, marginBottom: 4 },
-  ringAmount: { color: palette.textPrimary, fontSize: 25, fontFamily: typography.fonts.display, fontWeight: '700' },
-  ringGoal: { color: palette.textSecondary, fontSize: 10, marginTop: 3 },
-  dateSelector: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
-  dateArrow: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: palette.surface },
+  titleRow: { flexDirection: 'row', alignItems: 'center' },
+  backButton: { alignSelf: 'flex-start', marginBottom: spacing.xs },
+  backText: { color: palette.sage, fontSize: 10, fontWeight: '600' },
+  eyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 1.1, fontWeight: '700' },
+  title: { color: palette.textPrimary, fontSize: 25, lineHeight: 32, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: 3 },
+  dateSubtitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  subtitle: { flex: 1, color: palette.textSecondary, fontSize: 10, lineHeight: 16, marginTop: 2 },
+  nextDateButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  progressCard: { alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: borderRadius.large, backgroundColor: palette.sagePale },
+  progressRing: { width: 176, height: 176, position: 'relative' },
+  progressSvg: { position: 'absolute', left: 0, top: 0 },
+  ringCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  ringAmount: { color: palette.textPrimary, fontSize: 25, fontFamily: typography.fonts.display, fontWeight: '600' },
+  ringGoal: { color: palette.textSecondary, fontSize: 9, marginTop: 3 },
+  progressSummary: { color: palette.sage, fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: spacing.xs },
+  progressHint: { color: palette.textSecondary, fontSize: 8, marginTop: spacing.xs },
   dateArrowText: { color: palette.sage, fontSize: 22, lineHeight: 25 },
   disabledControl: { opacity: 0.4 },
-  dateLabelWrap: { alignItems: 'center', gap: 3 },
-  dateLabel: { color: palette.textPrimary, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
-  dateHint: { color: palette.textSecondary, fontSize: 9 },
-  remainingText: { color: palette.textSecondary, fontSize: 10, textAlign: 'center', lineHeight: 15, marginTop: spacing.sm },
-  sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: palette.textPrimary, fontSize: 16, fontFamily: typography.fonts.display, fontWeight: '600' },
-  sectionSubtitle: { color: palette.textSecondary, fontSize: 10, marginTop: 3 },
-  cupGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm },
-  cupButton: { width: '31%', minHeight: 91, alignItems: 'center', justifyContent: 'center', padding: spacing.xs, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-  cupButtonActive: { borderColor: palette.sage },
-  cupIllustration: { width: 30, height: 29, alignItems: 'center', justifyContent: 'flex-end', marginBottom: 5 },
-  cupBody: { width: 21, height: 25, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', borderWidth: 1.5, borderColor: palette.sage, borderTopWidth: 2, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 },
-  cupBodySmall: { width: 17, height: 19, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', borderWidth: 1.5, borderColor: palette.sage, borderTopWidth: 2, borderBottomLeftRadius: 5, borderBottomRightRadius: 5 },
-  cupBodyLarge: { width: 25, height: 28, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', borderWidth: 1.5, borderColor: palette.sage, borderTopWidth: 2, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
-  cupWater: { width: '100%', backgroundColor: palette.sageLight, borderTopLeftRadius: 5, borderTopRightRadius: 5 },
-  cupMugHandle: { position: 'absolute', right: 0, top: 8, width: 8, height: 10, borderWidth: 1.5, borderColor: palette.sage, borderLeftWidth: 0, borderTopRightRadius: 5, borderBottomRightRadius: 5 },
-  cupBottleNeck: { width: 8, height: 5, borderWidth: 1.5, borderBottomWidth: 0, borderColor: palette.sage, borderTopLeftRadius: 2, borderTopRightRadius: 2 },
-  cupBottleBody: { width: 18, height: 22, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', borderWidth: 1.5, borderColor: palette.sage, borderTopWidth: 0, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 },
-  cupAmount: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
-  cupLabel: { color: palette.textSecondary, fontSize: 8, marginTop: 2 },
-  customAmountCard: { padding: spacing.md, marginTop: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-  customAmountCopy: { gap: 4 },
-  customAmountTitle: { color: palette.textPrimary, fontSize: 12, fontWeight: '700' },
-  customAmountHint: { color: palette.textSecondary, fontSize: 9, lineHeight: 14 },
-  customAmountControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  customAmountInput: { flex: 1, minHeight: 42, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: palette.border, borderRadius: borderRadius.small, color: palette.textPrimary, fontSize: 14 },
-  customAmountUnit: { color: palette.textSecondary, fontSize: 11, fontWeight: '600' },
-  customAmountButton: { minHeight: 42, minWidth: 88, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
-  customAmountButtonText: { color: palette.surface, fontSize: 10, fontWeight: '700' },
-  guidanceNote: { color: palette.textSecondary, fontSize: 9, lineHeight: 14, marginTop: spacing.sm },
-  undoText: { color: palette.sage, fontSize: 9, fontWeight: '600' },
-  recordRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.xs, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-  recordIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: palette.sagePale },
-  recordIconText: { color: palette.sage, fontSize: 16 },
-  recordCopy: { flex: 1, gap: 3 },
-  recordTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
-  recordSubtitle: { color: palette.textSecondary, fontSize: 9 },
-  recordAmount: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.xs },
+  sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
+  sectionSubtitle: { color: palette.textSecondary, fontSize: 8, marginTop: 2 },
+  addWaterButton: { paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  addWaterButtonText: { color: palette.sage, fontSize: 8, fontWeight: '700' },
+  containerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'space-between' },
+  containerCard: { width: '31.5%', minHeight: 82, alignItems: 'center', justifyContent: 'center', padding: spacing.xs, marginBottom: spacing.xs, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  containerIcon: { fontSize: 22, marginBottom: 3 },
+  containerName: { color: palette.textPrimary, fontSize: 8, fontWeight: '700', textAlign: 'center' },
+  containerAmount: { color: palette.sage, fontSize: 8, marginTop: 2 },
+  containerHint: { color: palette.textSecondary, fontSize: 8, textAlign: 'center', marginTop: spacing.xs },
+  recordRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.xs, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  recordIcon: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center' },
+  recordTime: { flex: 1, color: palette.textSecondary, fontSize: 9 },
+  recordAmount: { color: palette.textPrimary, fontSize: 9, fontWeight: '700' },
+  recordUndo: { color: palette.textSecondary, fontSize: 17, marginLeft: spacing.xs },
   emptyCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   emptyTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '700' },
   emptyText: { color: palette.textSecondary, fontSize: 9, marginTop: 4 },
   loader: { marginVertical: spacing.md },
+  goalCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, marginTop: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  goalIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.sagePale },
+  goalIconText: { color: palette.sage, fontSize: 16 },
+  goalCopy: { flex: 1 },
+  goalTitle: { color: palette.textPrimary, fontSize: 9, fontWeight: '700' },
+  goalSubtitle: { color: palette.textSecondary, fontSize: 8, marginTop: 3 },
+  goalEditButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  goalEditText: { color: palette.sage, fontSize: 8, fontWeight: '700' },
+  guidanceNote: { color: palette.textSecondary, fontSize: 8, lineHeight: 12, marginTop: spacing.xs },
   premiumSection: { marginTop: spacing.md },
   statsCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   statsTitle: { color: palette.textPrimary, fontSize: 13, fontWeight: '700' },
@@ -544,4 +610,16 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   premiumButtonText: { color: palette.surface, fontSize: 10, fontWeight: '700' },
   localNote: { color: palette.textLight, fontSize: 8, textAlign: 'center', marginTop: spacing.lg },
   errorText: { color: palette.error, fontSize: 10, marginTop: spacing.sm },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(42, 48, 39, 0.38)' },
+  modal: { padding: spacing.lg, paddingBottom: spacing.xl, borderTopLeftRadius: borderRadius.large, borderTopRightRadius: borderRadius.large, backgroundColor: palette.background },
+  modalEyebrow: { color: palette.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.8, textAlign: 'center' },
+  modalTitle: { color: palette.textPrimary, fontSize: 20, fontFamily: typography.fonts.display, fontWeight: '600', textAlign: 'center', marginTop: spacing.xs },
+  modalDescription: { color: palette.textSecondary, fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: spacing.xs },
+  customAmountControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  customAmountInput: { flex: 1, minHeight: 46, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: palette.border, borderRadius: borderRadius.small, backgroundColor: palette.surface, color: palette.textPrimary, fontSize: 15 },
+  customAmountUnit: { color: palette.textSecondary, fontSize: 10, fontWeight: '600' },
+  modalPrimaryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
+  modalPrimaryButtonText: { color: palette.surface, fontSize: 9, fontWeight: '700' },
+  modalCancelButton: { minHeight: 36, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
+  modalCancelText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600' },
 });

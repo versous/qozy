@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { auth } from '@/services/firebase';
 import { queueOfflineWrite, saveCachedDocuments } from '@/services/offlineStore';
@@ -174,6 +175,7 @@ export default function MomentScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <BrandHeader />
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backButton}>
           <Text style={styles.backText}>‹  Aujourd’hui</Text>
         </Pressable>

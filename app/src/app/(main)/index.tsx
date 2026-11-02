@@ -17,10 +17,11 @@ import {
 import { Image } from 'expo-image';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 
 import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { AmbientGlow } from '@/components/SessionDeviceStatus';
@@ -77,6 +78,14 @@ const activityImages: { id: ActivityImageId; label: string; source: number }[] =
   { id: 'nature', label: 'Nature', source: require('@/assets/images/home-hero.jpg') },
 ];
 const activityIcons = ['🌿', '☀️', '🧘', '📖', '🎨', '🚶', '☕', '✨'];
+const quickAccessItems: { icon: string; label: string; route: Href }[] = [
+  { icon: '✓', label: 'Mes tâches', route: '/tasks' },
+  { icon: '◷', label: 'Mon temps', route: '/time-tracking' },
+  { icon: '▦', label: 'Calendrier', route: '/calendar' },
+  { icon: '♧', label: 'Hydratation', route: '/hydration' },
+  { icon: '♧', label: 'Rappels', route: '/reminders' },
+  { icon: '✳', label: 'Mon bilan', route: '/weekly-review' },
+];
 const toCloudActivity = (activity: Activity, userId: string) => ({
   title: activity.title,
   detail: activity.detail,
@@ -282,6 +291,10 @@ export default function Dashboard() {
     month: 'long',
   });
   const pendingTodoTasks = todoTasks.filter((task) => !task.completed);
+  const todayDateKey = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
+  const scheduledTask = pendingTodoTasks
+    .filter((task) => task.dueDate === todayDateKey && task.startTime)
+    .sort((left, right) => (left.startTime ?? '').localeCompare(right.startTime ?? ''))[0];
   const contextualActivityCategories: ActivityCategory[] = dayPeriod === 'morning'
     ? ['movement', 'calm']
     : dayPeriod === 'day' ? ['focus', 'movement'] : ['calm'];
@@ -707,23 +720,23 @@ export default function Dashboard() {
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
-          <View style={styles.brandLine}>
-            <Text style={styles.brandMark}>nid</Text>
-            <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Ouvrir mon compte"
-            onPress={() => router.push('/profile')}
-            style={styles.avatar}>
-            <Text style={styles.avatarText}>{firstName?.charAt(0).toUpperCase() ?? 'Q'}</Text>
-          </Pressable>
-        </View>
+        <BrandHeader
+          trailing={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir mon compte"
+              onPress={() => router.push('/profile')}
+              style={styles.avatar}>
+              <Text style={styles.avatarText}>{firstName?.charAt(0).toUpperCase() ?? 'Q'}</Text>
+            </Pressable>
+          }
+        />
 
         <Text style={styles.dateLabel}>{todayLabel}</Text>
         <Text style={styles.pageTitle}>
-          {firstName ? `Une chose à la fois, ${firstName}` : 'Une chose à la fois'}
+          {firstName
+            ? `Bonjour ${firstName}, ${dayPeriod === 'morning' ? 'voici ton matin' : dayPeriod === 'day' ? 'voici ta journée' : 'voici ta soirée'}`
+            : dayPeriod === 'morning' ? 'Bonjour, voici ton matin' : 'Une chose à la fois'}
         </Text>
 
         <View style={styles.heroCard}>
@@ -861,6 +874,23 @@ export default function Dashboard() {
             </View>
           </View>
         )}
+
+        {scheduledTask ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/tasks')}
+            style={styles.scheduledTaskCard}>
+            <View style={styles.scheduledTaskTime}>
+              <Text style={styles.scheduledTaskTimeText}>{scheduledTask.startTime}</Text>
+            </View>
+            <View style={styles.scheduledTaskCopy}>
+              <Text style={styles.scheduledTaskEyebrow}>TON PROCHAIN PETIT PAS</Text>
+              <Text numberOfLines={1} style={styles.scheduledTaskTitle}>{scheduledTask.title}</Text>
+              <Text style={styles.scheduledTaskHint}>Prévu aujourd’hui · Voir mes tâches</Text>
+            </View>
+            <Text style={styles.scheduledTaskArrow}>›</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.hydrationCard}>
           <View style={styles.hydrationHeading}>
@@ -1115,6 +1145,29 @@ export default function Dashboard() {
             <Text style={styles.actionArrow}>›</Text>
           </Pressable>
         )}
+
+        <View style={styles.quickAccessSection}>
+          <View style={styles.sectionHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>Votre parcours</Text>
+              <Text style={styles.sectionSubtitle}>Retrouve tes outils en un instant.</Text>
+            </View>
+          </View>
+          <View style={styles.quickAccessGrid}>
+            {quickAccessItems.map((item) => (
+              <Pressable
+                key={item.label}
+                accessibilityRole="button"
+                onPress={() => router.push(item.route)}
+                style={({ pressed }) => [styles.quickAccessCard, pressed && styles.pressed]}>
+                <View style={styles.quickAccessIcon}>
+                  <Text style={styles.quickAccessIconText}>{item.icon}</Text>
+                </View>
+                <Text numberOfLines={1} style={styles.quickAccessLabel}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
 
         <Text style={styles.reassurance}>Vous n’avez pas à tout faire aujourd’hui.</Text>
       </ScrollView>
@@ -1664,6 +1717,53 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: 10,
     lineHeight: 15,
   },
+  scheduledTaskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    marginTop: -spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.medium,
+    backgroundColor: palette.sagePale,
+  },
+  scheduledTaskTime: {
+    minWidth: 54,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.small,
+    backgroundColor: palette.surface,
+  },
+  scheduledTaskTimeText: {
+    color: palette.sage,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  scheduledTaskCopy: {
+    flex: 1,
+  },
+  scheduledTaskEyebrow: {
+    color: palette.sage,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  scheduledTaskTitle: {
+    color: palette.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  scheduledTaskHint: {
+    color: palette.textSecondary,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  scheduledTaskArrow: {
+    color: palette.sage,
+    fontSize: 22,
+  },
   hydrationCard: {
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -2050,6 +2150,46 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     color: palette.textSecondary,
     fontSize: 10,
     marginTop: 2,
+  },
+  quickAccessSection: {
+    marginTop: spacing.md,
+  },
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: spacing.sm,
+  },
+  quickAccessCard: {
+    width: '31.5%',
+    minHeight: 78,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.medium,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  quickAccessIcon: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: palette.sagePale,
+  },
+  quickAccessIconText: {
+    color: palette.sage,
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  quickAccessLabel: {
+    color: palette.textPrimary,
+    fontSize: 9,
+    fontWeight: '600',
   },
   reassurance: {
     color: palette.textSecondary,

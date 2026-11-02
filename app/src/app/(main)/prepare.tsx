@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { spacing, borderRadius, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -13,7 +14,6 @@ const durations = [10, 25, 40];
 const activities = [
   { title: 'Lire', description: 'Une session calme pour retrouver son rythme.', minutes: 25, icon: '▤' },
   { title: 'Étudier', description: 'Se concentrer sur un cours ou un projet.', minutes: 25, icon: '✎' },
-  { title: 'Méditer', description: 'Une pause pour respirer et se ressourcer.', minutes: 10, icon: '◉' },
 ];
 
 export default function PrepareScreen() {
@@ -35,6 +35,7 @@ export default function PrepareScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <BrandHeader />
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backButton}>
           <Text style={styles.backText}>‹  Aujourd’hui</Text>
         </Pressable>
@@ -73,7 +74,7 @@ export default function PrepareScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Mes activités</Text>
-          <Text style={styles.muted}>3 activités</Text>
+          <Text style={styles.muted}>{activities.length} activités</Text>
         </View>
         {activities.map((item) => {
           const selected = item.title === activity;
@@ -84,6 +85,12 @@ export default function PrepareScreen() {
                 setActivity(item.title);
                 setDuration(item.minutes);
                 setSessionType('Focus');
+                if (item.title === 'Lire' || item.title === 'Étudier') {
+                  router.push({
+                    pathname: '/ritual',
+                    params: { activity: item.title },
+                  });
+                }
               }}
               style={[styles.activityCard, selected && styles.activityCardSelected]}>
               <View style={[styles.activityIcon, selected && styles.activityIconSelected]}>

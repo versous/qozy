@@ -11,8 +11,19 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 export default function ActivityReadyScreen() {
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
-  const { activity: requestedActivity, minutes: requestedMinutes, category: requestedCategory } =
-    useLocalSearchParams<{ activity?: string; minutes?: string; category?: string }>();
+  const {
+    activity: requestedActivity,
+    minutes: requestedMinutes,
+    category: requestedCategory,
+    repetitions: requestedRepetitions,
+    exerciseId,
+  } = useLocalSearchParams<{
+    activity?: string;
+    minutes?: string;
+    category?: string;
+    repetitions?: string;
+    exerciseId?: string;
+  }>();
   const category = requestedCategory === 'meditation'
     ? 'meditation'
     : requestedCategory === 'sport' ? 'sport' : 'lofi';
@@ -23,6 +34,11 @@ export default function ActivityReadyScreen() {
   const minutes = Number.isInteger(parsedMinutes) && parsedMinutes > 0 && parsedMinutes <= 90
     ? parsedMinutes
     : category === 'meditation' ? 10 : 25;
+  const parsedRepetitions = Number(requestedRepetitions);
+  const repetitions = category === 'sport' && Number.isInteger(parsedRepetitions)
+    && parsedRepetitions > 0 && parsedRepetitions <= 1000
+    ? parsedRepetitions
+    : undefined;
 
   useEffect(() => {
     if (music.isLoaded && !music.isBuffering) {
@@ -57,7 +73,13 @@ export default function ActivityReadyScreen() {
     music.play();
     router.replace({
       pathname: category === 'meditation' ? '/meditation-session' : '/focus',
-      params: { activity, minutes: String(minutes), category },
+      params: {
+        activity,
+        minutes: String(minutes),
+        category,
+        ...(repetitions ? { repetitions: String(repetitions) } : {}),
+        ...(exerciseId ? { exerciseId } : {}),
+      },
     });
   };
 
@@ -79,7 +101,7 @@ export default function ActivityReadyScreen() {
           <Text style={styles.eyebrow}>ON PRÉPARE TON ESPACE</Text>
           <Text style={styles.title}>{activity}</Text>
           <Text style={styles.subtitle}>
-            {minutes} min · {category === 'meditation'
+            {repetitions ? `${repetitions} répétitions · ` : `${minutes} min · `}{category === 'meditation'
               ? 'Méditation'
               : category === 'sport' ? 'Musique de sport' : 'Ambiance Lofi'}
           </Text>

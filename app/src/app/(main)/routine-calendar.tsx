@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useExercises } from '@/hooks/useExercises';
 import { useHabits, type Habit } from '@/hooks/useHabits';
 import { usePremium } from '@/services/PremiumProvider';
+import { BrandHeader } from '@/components/BrandHeader';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -64,6 +65,7 @@ export default function RoutineCalendarScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <BrandHeader />
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>‹  Retour à ma routine</Text>
         </Pressable>

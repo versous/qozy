@@ -4,6 +4,7 @@
     "slug": "app",
     "version": "1.0.0",
     "orientation": "default",
+    "newArchEnabled": true,
     "icon": "./assets/images/icon.png",
     "scheme": "app",
     "userInterfaceStyle": "automatic",
@@ -12,10 +13,16 @@
     ],
     "ios": {
       "bundleIdentifier": "com.versous.qozy",
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Qozy utilise la caméra pour compter tes mouvements pendant les exercices compatibles. Les images sont analysées sur ton téléphone et ne sont pas enregistrées."
+      }
     },
     "android": {
       "package": "com.versous.qozy",
+      "permissions": [
+        "CAMERA"
+      ],
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

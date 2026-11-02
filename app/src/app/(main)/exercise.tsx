@@ -14,8 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
-import { Exercise, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
+import { Exercise, ExerciseMode, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
 import { type HabitDay } from '@/hooks/useHabits';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
@@ -31,6 +32,8 @@ const catalog: Activity[] = [
   { name: 'Mobilité des épaules', duration: 5, intensity: 'Douce', equipment: 'Sans matériel', note: '' },
   { name: 'Renforcement léger', duration: 12, intensity: 'Modérée', equipment: 'Un tapis', note: '' },
   { name: 'Pause étirements', duration: 5, intensity: 'Douce', equipment: 'Sur une chaise', note: '' },
+  { name: 'Pompes', duration: 1, mode: 'repetitions', targetReps: 20, intensity: 'Modérée', equipment: 'Sans matériel', note: '' },
+  { name: 'Squats', duration: 1, mode: 'repetitions', targetReps: 15, intensity: 'Douce', equipment: 'Sans matériel', note: '' },
 ];
 
 const filters: Filter[] = ['Tous', 'Doux', 'Sans matériel'];
@@ -47,6 +50,8 @@ export default function ExerciseScreen() {
   const [saveError, setSaveError] = useState('');
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('15');
+  const [exerciseMode, setExerciseMode] = useState<ExerciseMode>('timer');
+  const [targetReps, setTargetReps] = useState('20');
   const [intensity, setIntensity] = useState<Intensity>('Douce');
   const [equipment, setEquipment] = useState('Sans matériel');
   const [note, setNote] = useState('');
@@ -60,9 +65,11 @@ export default function ExerciseScreen() {
   const availableExercises = useMemo(
     () => [
       ...catalog,
-      ...customExercises.map(({ name, duration, intensity, equipment, note }) => ({
+      ...customExercises.map(({ name, duration, mode, targetReps, intensity, equipment, note }) => ({
         name,
         duration,
+        mode,
+        targetReps,
         intensity,
         equipment,
         note,
@@ -79,13 +86,25 @@ export default function ExerciseScreen() {
     return matchesSearch && matchesFilter;
   });
   const selectedExercises = exercises.filter((exercise) => isExerciseScheduledOnDate(exercise, today));
-  const selectedDuration = selectedExercises.reduce((total, exercise) => total + exercise.duration, 0);
+  const selectedDuration = selectedExercises
+    .filter((exercise) => exercise.mode !== 'repetitions')
+    .reduce((total, exercise) => total + exercise.duration, 0);
+  const selectedRepetitions = selectedExercises
+    .filter((exercise) => exercise.mode === 'repetitions')
+    .reduce((total, exercise) => total + (exercise.targetReps ?? 0), 0);
 
   const toggleExercise = async (exercise: Activity) => {
     setSavingName(exercise.name);
     setSaveError('');
     try {
-      await toggleToday(exercise.name, exercise.duration, exercise.intensity, exercise.equipment);
+      await toggleToday(
+        exercise.name,
+        exercise.duration,
+        exercise.intensity,
+        exercise.equipment,
+        exercise.mode ?? 'timer',
+        exercise.targetReps ?? undefined,
+      );
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : 'Impossible de modifier la routine.');
     } finally {
@@ -97,6 +116,8 @@ export default function ExerciseScreen() {
     setEditingExercise(exercise);
     setName(exercise.name);
     setDuration(String(exercise.duration));
+    setExerciseMode(exercise.mode ?? 'timer');
+    setTargetReps(String(exercise.targetReps ?? 20));
     setIntensity(exercise.intensity === 'Modérée' ? 'Modérée' : 'Douce');
     setEquipment(exercise.equipment);
     setNote(exercise.note);
@@ -110,6 +131,8 @@ export default function ExerciseScreen() {
     setEditingExercise(null);
     setName('');
     setDuration('15');
+    setExerciseMode('timer');
+    setTargetReps('20');
     setIntensity('Douce');
     setEquipment('Sans matériel');
     setNote('');
@@ -121,12 +144,17 @@ export default function ExerciseScreen() {
 
   const saveCustom = async () => {
     const minutes = Number(duration);
+    const repetitions = Number(targetReps);
     if (!name.trim()) {
       setSaveError('Donne un nom à ton exercice.');
       return;
     }
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) {
+    if (exerciseMode === 'timer' && (!Number.isInteger(minutes) || minutes < 1 || minutes > 180)) {
       setSaveError('Choisis une durée entre 1 et 180 minutes.');
+      return;
+    }
+    if (exerciseMode === 'repetitions' && (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 1000)) {
+      setSaveError('Choisis un nombre de répétitions entre 1 et 1 000.');
       return;
     }
 
@@ -142,7 +170,9 @@ export default function ExerciseScreen() {
           equipment,
           note,
           routineDays,
-          addNewToToday
+          addNewToToday,
+          exerciseMode,
+          exerciseMode === 'repetitions' ? repetitions : undefined,
         );
       } else {
         await addCustomExercise(
@@ -152,11 +182,15 @@ export default function ExerciseScreen() {
           equipment.trim() || 'Sans matériel',
           note,
           addNewToToday,
-          routineDays
+          routineDays,
+          exerciseMode,
+          exerciseMode === 'repetitions' ? repetitions : undefined,
         );
       }
       setName('');
       setDuration('15');
+      setExerciseMode('timer');
+      setTargetReps('20');
       setIntensity('Douce');
       setEquipment('Sans matériel');
       setNote('');
@@ -176,10 +210,7 @@ export default function ExerciseScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.brandLine}>
-          <Text style={styles.brand}>nid</Text>
-          <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-        </View>
+        <BrandHeader />
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
           <Text style={styles.backText}>‹  Aujourd’hui</Text>
         </Pressable>
@@ -232,10 +263,35 @@ export default function ExerciseScreen() {
             <Text style={styles.formSubtitle}>Tes envies, ton mouvement, ton rythme.</Text>
             <Text style={styles.label}>Nom de l’exercice *</Text>
             <TextInput value={name} onChangeText={setName} placeholder="Ma marche du soir" placeholderTextColor={colors.textLight} style={styles.input} maxLength={70} />
-            <Text style={styles.label}>Durée *</Text>
+            <Text style={styles.label}>Comment suivre cet exercice ?</Text>
+            <View style={styles.modeOptions}>
+              {([
+                { value: 'timer', label: 'Avec un minuteur' },
+                { value: 'repetitions', label: 'Avec un compteur' },
+              ] as const).map((option) => (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: exerciseMode === option.value }}
+                  onPress={() => setExerciseMode(option.value)}
+                  style={[styles.modeOption, exerciseMode === option.value && styles.modeOptionSelected]}>
+                  <Text style={[styles.modeOptionText, exerciseMode === option.value && styles.modeOptionTextSelected]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.label}>
+              {exerciseMode === 'timer' ? 'Durée *' : 'Nombre de répétitions *'}
+            </Text>
             <View style={styles.durationInputRow}>
-              <TextInput value={duration} onChangeText={setDuration} keyboardType="number-pad" style={[styles.input, styles.durationInput]} />
-              <Text style={styles.inputSuffix}>min</Text>
+              <TextInput
+                value={exerciseMode === 'timer' ? duration : targetReps}
+                onChangeText={exerciseMode === 'timer' ? setDuration : setTargetReps}
+                keyboardType="number-pad"
+                style={[styles.input, styles.durationInput]}
+              />
+              <Text style={styles.inputSuffix}>{exerciseMode === 'timer' ? 'min' : 'répétitions'}</Text>
               <View style={styles.flexSpace} />
               <Text style={styles.label}>Intensité</Text>
               {(['Douce', 'Modérée'] as const).map((value) => (
@@ -314,7 +370,12 @@ export default function ExerciseScreen() {
                     <View style={styles.exerciseIcon}><Text style={styles.exerciseIconText}>✳</Text></View>
                     <View style={styles.exerciseCopy}>
                       <Text style={styles.exerciseName}>{exercise.name}</Text>
-                      <Text style={styles.exerciseMeta}>{exercise.duration} min · {exercise.intensity} · {exercise.equipment}</Text>
+                      <Text style={styles.exerciseMeta}>
+                        {exercise.mode === 'repetitions'
+                          ? `${exercise.targetReps ?? 1} répétitions`
+                          : `${exercise.duration} min`}
+                        {' · '}{exercise.intensity} · {exercise.equipment}
+                      </Text>
                     </View>
                     <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
                       {selected ? <Text style={styles.checkboxCheck}>✓</Text> : null}
@@ -350,7 +411,11 @@ export default function ExerciseScreen() {
             {!filteredExercises.length ? <Text style={styles.emptyText}>Aucun exercice ne correspond à ta recherche.</Text> : null}
             {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
             <View style={styles.selectionSummary}>
-              <Text style={styles.selectionCount}>{selectedExercises.length} sélectionné{selectedExercises.length > 1 ? 's' : ''} · {selectedDuration} min à ton rythme</Text>
+              <Text style={styles.selectionCount}>
+                {selectedExercises.length} sélectionné{selectedExercises.length > 1 ? 's' : ''}
+                {selectedDuration ? ` · ${selectedDuration} min` : ''}
+                {selectedRepetitions ? ` · ${selectedRepetitions} répétitions` : ''}
+              </Text>
               <CosyButton
                 title="Ajouter à aujourd’hui"
                 onPress={() => router.replace('/movement')}
@@ -406,6 +471,11 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   input: { minHeight: 42, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border, color: palette.textPrimary, fontSize: 11 },
   durationInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   durationInput: { width: 62 },
+  modeOptions: { flexDirection: 'row', gap: spacing.xs },
+  modeOption: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 38, paddingHorizontal: spacing.xs, borderRadius: borderRadius.small, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border },
+  modeOptionSelected: { backgroundColor: palette.sage, borderColor: palette.sage },
+  modeOptionText: { color: palette.textSecondary, fontSize: 9, fontWeight: '600', textAlign: 'center' },
+  modeOptionTextSelected: { color: palette.surface },
   inputSuffix: { color: palette.textSecondary, fontSize: 10 },
   flexSpace: { flex: 1 },
   intensityChip: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: borderRadius.extraLarge, backgroundColor: palette.background },

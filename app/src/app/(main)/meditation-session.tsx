@@ -1,6 +1,6 @@
 import { typography } from '@/theme/typography';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Animated, Easing, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, ImageBackground, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -14,6 +14,8 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 export default function MeditationSessionScreen() {
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const { activity: requestedActivity, minutes: requestedMinutes } =
     useLocalSearchParams<{ activity?: string; minutes?: string }>();
   const parsedMinutes = Number(requestedMinutes);
@@ -86,10 +88,72 @@ export default function MeditationSessionScreen() {
           </View>
         </View>
 
-        <View style={styles.sessionStage}>
+        <View style={[styles.sessionStage, isLandscape && styles.sessionStageLandscape]}>
           <Animated.View
             pointerEvents={isComplete ? 'none' : 'auto'}
-            style={[styles.sessionCard, { opacity: sessionLayerOpacity }]}>
+            style={[
+              styles.sessionCard,
+              isLandscape && styles.sessionCardLandscape,
+              { opacity: sessionLayerOpacity, height: isLandscape ? '100%' : undefined },
+            ]}>
+            {isLandscape ? (
+              <View style={styles.sessionLandscapeLayout}>
+                <View style={styles.progressLandscape}>
+                  <BreathingProgress
+                    progress={progress}
+                    isActive={isActive}
+                    complete={isComplete}
+                    size={76}
+                    align="center"
+                  />
+                </View>
+                <ScrollView
+                  style={styles.landscapeContent}
+                  contentContainerStyle={styles.landscapeContentInner}
+                  showsVerticalScrollIndicator
+                  nestedScrollEnabled>
+                  <Text style={styles.eyebrow}>MOMENT POUR TOI</Text>
+                  <Text style={styles.activity}>{activity}</Text>
+                  <Text style={styles.total}>Un instant après l’autre · {duration} min</Text>
+                  <Text style={styles.gentlePrompt}>Inspire doucement. Tu n’as rien à réussir.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={isActive ? pauseTimer : startTimer}
+                    disabled={secondsLeft === 0}
+                    style={[styles.primaryButton, styles.compactButton, secondsLeft === 0 && styles.disabledButton]}>
+                    <Text style={styles.primaryButtonText}>
+                      {secondsLeft === 0 ? '✓  Séance terminée' : isActive ? 'Ⅱ  Pause' : '▷  Reprendre'}
+                    </Text>
+                  </Pressable>
+                  {secondsLeft === 0 ? (
+                    <Pressable onPress={restartSession} style={styles.resetButton}>
+                      <Text style={styles.resetText}>Recommencer</Text>
+                    </Pressable>
+                  ) : null}
+                  <View style={styles.musicRow}>
+                    <View style={styles.musicCopy}>
+                      <Text style={styles.musicTitle} numberOfLines={1}>{music.currentTrack.title}</Text>
+                      <Text style={styles.musicArtist}>{music.currentTrack.artist}</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={music.isPlaying ? 'Mettre la musique en pause' : 'Reprendre la musique'}
+                      onPress={music.togglePlayback}
+                      style={styles.musicButton}>
+                      <Text style={styles.musicButtonText}>{music.isPlaying ? 'Ⅱ' : '▷'}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Passer à la musique suivante"
+                      onPress={music.nextTrack}
+                      style={styles.musicButton}>
+                      <Text style={styles.musicButtonText}>»</Text>
+                    </Pressable>
+                  </View>
+                </ScrollView>
+              </View>
+            ) : (
+              <>
             <Text style={styles.eyebrow}>MOMENT POUR TOI</Text>
             <Text style={styles.activity}>{activity}</Text>
             <Text style={styles.total}>Un instant après l’autre · {duration} min</Text>
@@ -138,10 +202,17 @@ export default function MeditationSessionScreen() {
                 <Text style={styles.musicButtonText}>»</Text>
               </Pressable>
             </View>
+              </>
+            )}
           </Animated.View>
           <Animated.View
             pointerEvents={isComplete ? 'auto' : 'none'}
-            style={[styles.sessionCard, styles.restCard, { opacity: completionOpacity }]}>
+            style={[
+              styles.sessionCard,
+              styles.restCard,
+              isLandscape && styles.sessionCardLandscape,
+              { opacity: completionOpacity },
+            ]}>
             <Text style={styles.restSymbol}>☾</Text>
             <Text style={styles.restTitle}>Le moment est venu de souffler</Text>
             <Text style={styles.gentlePrompt}>Belle parenthèse. Tu as pris ce temps pour toi.</Text>
@@ -167,7 +238,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   quitButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface },
   quitText: { color: palette.textPrimary, fontSize: 10, fontWeight: '600' },
   sessionStage: { width: '100%', marginLeft: -spacing.md, paddingLeft: spacing.xs, alignItems: 'flex-start', justifyContent: 'center' },
+  sessionStageLandscape: { flex: 1, minHeight: 0, justifyContent: 'center', paddingVertical: spacing.xs },
   sessionCard: { width: '76%', maxWidth: 280, alignSelf: 'flex-start', padding: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: withAlpha(palette.surface, 0.38), borderWidth: 1, borderColor: withAlpha(palette.surface, 0.5), overflow: 'hidden' },
+  sessionCardLandscape: { width: '92%', maxWidth: 620, height: '100%', maxHeight: '100%', padding: spacing.xs, flexShrink: 1 },
+  sessionLandscapeLayout: { flexDirection: 'row', alignItems: 'center', flex: 1, minHeight: 0, gap: spacing.sm },
+  progressLandscape: { width: 82, alignItems: 'center', justifyContent: 'center' },
+  landscapeContent: { flex: 1, minHeight: 0 },
+  landscapeContentInner: { flexGrow: 1, justifyContent: 'center', paddingVertical: spacing.xs },
   restCard: { position: 'absolute', backgroundColor: withAlpha(palette.sagePale, 0.5) },
   eyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 0.8, fontWeight: '700' },
   activity: { color: palette.textPrimary, fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '600', marginTop: spacing.xs },

@@ -1,6 +1,6 @@
 import { typography } from '@/theme/typography';
 import React, { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
@@ -8,6 +8,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useMonthlyGoals } from '@/hooks/useMonthlyGoals';
 import { useTasks } from '@/hooks/useTasks';
 import { usePremium } from '@/services/PremiumProvider';
+import { BrandHeader } from '@/components/BrandHeader';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -79,7 +80,13 @@ export default function PremiumScreen() {
     restore,
     manageSubscription,
   } = usePremium();
-  const { allHabits, loading: habitsLoading, error: habitsError } = useHabits();
+  const {
+    habits: dailyHabits,
+    allHabits,
+    loading: habitsLoading,
+    error: habitsError,
+    toggleHabit,
+  } = useHabits();
   const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
   const now = new Date();
   const todayKey = getDateKey(now);
@@ -100,12 +107,10 @@ export default function PremiumScreen() {
   const weekStart = new Date(`${todayKey}T00:00:00`);
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const weeklyHabits = getHabitSummary(allHabits, weekStart, now);
   const monthlyHabits = getHabitSummary(allHabits, monthStart, now);
-  const weeklyTasks = getTaskSummary(tasks, weekStart, now);
   const monthlyTasks = getTaskSummary(tasks, monthStart, now);
-  const weekLabel = `${weekStart.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} – ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
   const monthLabel = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const completedDailyHabits = dailyHabits.filter((habit) => habit.isCompleted).length;
 
   const changeTarget = (kind: 'habit' | 'task', delta: number) => {
     setGoalMessage(null);
@@ -151,6 +156,7 @@ export default function PremiumScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <BrandHeader />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Retour"
@@ -159,12 +165,12 @@ export default function PremiumScreen() {
           <Text style={styles.backText}>‹  Retour</Text>
         </Pressable>
 
-        <Text style={styles.eyebrow}>QOZY PREMIUM</Text>
+        <Text style={styles.eyebrow}>{isPremium ? 'À TON RYTHME' : 'QOZY PREMIUM'}</Text>
         <Text style={styles.title}>
-          {isPremium ? 'Tes repères dans le temps.' : 'Avance avec plus de clarté.'}
+          {isPremium ? 'Mes petits rituels' : 'Avance avec plus de clarté.'}
         </Text>
         <Text style={styles.subtitle}>
-          Des bilans concrets pour célébrer tes progrès, sans pression.
+          {isPremium ? 'La régularité se construit en douceur.' : 'Des outils pour prendre soin de tes habitudes, à ton rythme.'}
         </Text>
 
         {canPreview ? (
@@ -172,7 +178,7 @@ export default function PremiumScreen() {
             <View style={styles.previewCopy}>
               <Text style={styles.previewTitle}>Aperçu développeur</Text>
               <Text style={styles.previewDetail}>
-                Active Premium pour tester les bilans, objectifs et morceaux réservés. Cela ne crée aucun achat.
+                Active Premium pour tester les objectifs, le calendrier d’activités et les contenus réservés. Cela ne crée aucun achat.
               </Text>
             </View>
             <Pressable
@@ -195,51 +201,121 @@ export default function PremiumScreen() {
 
         {isPremium ? (
           <>
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Cette semaine</Text>
-              <Text style={styles.sectionMeta}>{weekLabel}</Text>
-            </View>
-            <View style={styles.reportCard}>
-              <Text style={styles.cardEyebrow}>TON BILAN HEBDOMADAIRE</Text>
-              <MetricRow
-                label="Habitudes réalisées"
-                value={`${weeklyHabits.completed} / ${weeklyHabits.planned}`}
-                percent={getPercent(weeklyHabits.completed, weeklyHabits.planned)}
-                styles={styles}
-                colors={colors}
-              />
-              <MetricRow
-                label="Petits pas du calendrier"
-                value={`${weeklyTasks.completed} / ${weeklyTasks.planned}`}
-                percent={getPercent(weeklyTasks.completed, weeklyTasks.planned)}
-                styles={styles}
-                colors={colors}
-              />
+            <View style={styles.dailySummaryCard}>
+              <View style={styles.dailySummaryHeader}>
+                <Text style={styles.dailySummaryTitle}>
+                  {completedDailyHabits} habitude{completedDailyHabits === 1 ? '' : 's'} sur {dailyHabits.length} validée{dailyHabits.length === 1 ? '' : 's'} aujourd’hui
+                </Text>
+                <Text style={styles.dailySummaryPercent}>
+                  {getPercent(completedDailyHabits, dailyHabits.length)} %
+                </Text>
+              </View>
+              <View style={styles.dailyProgressTrack}>
+                <View style={[styles.dailyProgressFill, { width: `${getPercent(completedDailyHabits, dailyHabits.length)}%` }]} />
+              </View>
+              <Text style={styles.dailySummaryNote}>
+                {now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })} · Chaque petit pas compte.
+              </Text>
             </View>
 
             <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Progression du mois</Text>
-              <Text style={styles.sectionMeta}>{monthLabel}</Text>
+              <Text style={styles.sectionTitle}>Prendre soin du quotidien</Text>
+              <Text style={styles.sectionMeta}>{now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</Text>
             </View>
-            <View style={styles.reportCard}>
-              <MetricRow
-                label="Rendez-vous avec tes habitudes"
-                value={`${monthlyHabits.completed} / ${monthlyHabits.planned}`}
-                percent={getPercent(monthlyHabits.completed, monthlyHabits.planned)}
-                styles={styles}
-                colors={colors}
-              />
-              <MetricRow
-                label="Petits pas prévus"
-                value={`${monthlyTasks.completed} / ${monthlyTasks.planned}`}
-                percent={getPercent(monthlyTasks.completed, monthlyTasks.planned)}
-                styles={styles}
-                colors={colors}
-              />
-              <Text style={styles.helperText}>
-                Les petits pas sont comptés selon leur date prévue et leur état actuel.
-              </Text>
-            </View>
+            {habitsLoading ? (
+              <ActivityIndicator color={colors.sage} style={styles.loader} />
+            ) : dailyHabits.length ? (
+              dailyHabits.map((habit) => {
+                const weekly = getHabitSummary([habit], weekStart, now);
+                const dailyProgress = habit.goalType === 'check'
+                  ? habit.isCompleted ? 100 : 0
+                  : getPercent(
+                    habit.todayProgress,
+                    habit.goalType === 'timer' ? habit.goalTarget * 60 : habit.goalTarget
+                  );
+                const progressLabel = habit.goalType === 'timer'
+                  ? `${Math.floor(habit.todayProgress / 60)} / ${habit.goalTarget} min`
+                  : habit.goalType === 'count'
+                    ? `${habit.todayProgress} / ${habit.goalTarget} ${habit.goalUnit}`
+                    : `${weekly.completed} / ${weekly.planned} validations cette semaine`;
+                return (
+                  <View key={habit.id} style={styles.ritualCard}>
+                    <View style={styles.ritualHeader}>
+                      <View style={styles.ritualIcon}>
+                        <Text style={styles.ritualIconText}>{habit.icon || '◉'}</Text>
+                      </View>
+                      <View style={styles.ritualCopy}>
+                        <Text style={styles.ritualTitle}>{habit.title}</Text>
+                        <Text style={styles.ritualSchedule}>
+                          {habit.frequencyDays.length === 7
+                            ? 'Tous les jours'
+                            : `${habit.frequencyDays.length} jour${habit.frequencyDays.length === 1 ? '' : 's'} prévu${habit.frequencyDays.length === 1 ? '' : 's'} cette semaine`}
+                          {habit.streak ? ` · ${habit.streak} jours de suite` : ''}
+                        </Text>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Modifier ${habit.title}`}
+                        onPress={() => router.push('/tasks')}
+                        hitSlop={8}>
+                        <Text style={styles.editHabit}>✎</Text>
+                      </Pressable>
+                    </View>
+                    <View style={styles.dailyProgressTrack}>
+                      <View style={[styles.dailyProgressFill, { width: `${dailyProgress}%` }]} />
+                    </View>
+                    <Text style={styles.ritualMeta}>
+                      {progressLabel} · {habit.isCompleted ? 'Rituel validé' : 'À ton rythme'}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ checked: habit.isCompleted }}
+                      onPress={() => {
+                        if (habit.goalType !== 'check') {
+                          router.push('/tasks');
+                          return;
+                        }
+                        void toggleHabit(habit.id).catch((reason: unknown) => {
+                          Alert.alert(
+                            'Modification impossible',
+                            reason instanceof Error ? reason.message : 'Réessaie plus tard.'
+                          );
+                        });
+                      }}
+                      style={[
+                        styles.ritualAction,
+                        habit.isCompleted && styles.ritualActionDone,
+                        habit.goalType !== 'check' && styles.ritualActionDisabled,
+                      ]}>
+                      <Text style={[
+                        styles.ritualActionText,
+                        habit.isCompleted && styles.ritualActionTextDone,
+                      ]}>
+                        {habit.goalType !== 'check'
+                          ? '＋  Suivre ma progression'
+                          : habit.isCompleted
+                            ? '✓  Fait aujourd’hui · Annuler'
+                            : '✓  Valider mon rituel'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.emptyHabitsCard}>
+                <Text style={styles.emptyHabitsText}>Pas encore de rituel prévu aujourd’hui.</Text>
+              </View>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/tasks')}
+              style={styles.createHabitButton}>
+              <Text style={styles.createHabitText}>＋  Créer une habitude</Text>
+            </Pressable>
+            <Text style={styles.habitsFootnote}>
+              Une série compte les jours programmés consécutifs. Les jours de repos ne l’interrompent pas.
+            </Text>
+
             <View style={styles.sectionHeading}>
               <Text style={styles.sectionTitle}>Mes objectifs du mois</Text>
               <Text style={styles.sectionMeta}>{monthLabel}</Text>
@@ -286,16 +362,6 @@ export default function PremiumScreen() {
             <View style={styles.featureLinks}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push('/weekly-review')}
-                style={styles.featureLink}>
-                <View style={styles.featureLinkCopy}>
-                  <Text style={styles.featureLinkTitle}>Bilan hebdomadaire</Text>
-                  <Text style={styles.featureLinkSubtitle}>Voir mon cercle de progression du mois</Text>
-                </View>
-                <Text style={styles.featureLinkArrow}>›</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
                 onPress={() => router.push('/activity-calendar')}
                 style={styles.featureLink}>
                 <View style={styles.featureLinkCopy}>
@@ -323,8 +389,6 @@ export default function PremiumScreen() {
         ) : (
           <>
             <View style={styles.benefitCard}>
-              <FeatureRow title="Bilan hebdomadaire" detail="Retrouve les petits pas accomplis cette semaine." styles={styles} />
-              <FeatureRow title="Progression du mois" detail="Visualise tes habitudes et tes petits pas au fil des jours." styles={styles} />
               <FeatureRow title="Calendrier de chaque activité" detail="Repère tes jours actifs dans une vue annuelle." styles={styles} />
               <FeatureRow title="Petits moments personnalisés" detail="Crée et modifie tes propres activités, avec tes photos et leurs étapes." styles={styles} />
               <FeatureRow title="Bibliothèque musicale étendue" detail="Débloque des titres Lofi et de méditation supplémentaires. Deux morceaux de chaque catégorie restent inclus en Standard." styles={styles} />
@@ -405,32 +469,6 @@ export default function PremiumScreen() {
   );
 }
 
-function MetricRow({
-  label,
-  value,
-  percent,
-  styles,
-  colors,
-}: {
-  label: string;
-  value: string;
-  percent: number;
-  styles: ReturnType<typeof createStyles>;
-  colors: AppColors;
-}) {
-  return (
-    <View style={styles.metric}>
-      <View style={styles.metricHeading}>
-        <Text style={styles.metricLabel}>{label}</Text>
-        <Text style={styles.metricValue}>{value}</Text>
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${percent}%`, backgroundColor: colors.sage }]} />
-      </View>
-    </View>
-  );
-}
-
 function GoalControl({
   title,
   current,
@@ -508,7 +546,6 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   sectionMeta: { color: palette.textSecondary, fontSize: 9 },
   reportCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, gap: spacing.md },
   cardEyebrow: { color: palette.sage, fontSize: 8, letterSpacing: 1, fontWeight: '700' },
-  metric: { gap: 7 },
   metricHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   metricLabel: { flex: 1, color: palette.textPrimary, fontSize: 11 },
   metricValue: { color: palette.sage, fontSize: 12, fontWeight: '700' },
@@ -563,4 +600,30 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   previewButtonText: { color: palette.clay, fontSize: 9, fontWeight: '700' },
   previewButtonTextActive: { color: palette.surface },
   previewNotice: { width: '100%', color: palette.clay, fontSize: 8, letterSpacing: 0.6, fontWeight: '700' },
+  dailySummaryCard: { padding: spacing.sm, marginTop: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.sagePale },
+  dailySummaryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+  dailySummaryTitle: { flex: 1, color: palette.textPrimary, fontSize: 8, fontWeight: '700' },
+  dailySummaryPercent: { color: palette.sage, fontSize: 8, fontWeight: '700' },
+  dailyProgressTrack: { height: 5, overflow: 'hidden', borderRadius: borderRadius.extraLarge, backgroundColor: palette.border, marginTop: spacing.xs },
+  dailyProgressFill: { height: '100%', borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
+  dailySummaryNote: { color: palette.textSecondary, fontSize: 7, marginTop: spacing.xs, textTransform: 'capitalize' },
+  ritualCard: { padding: spacing.sm, marginBottom: spacing.xs, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  ritualHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  ritualIcon: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.sagePale },
+  ritualIconText: { color: palette.sage, fontSize: 14 },
+  ritualCopy: { flex: 1, minWidth: 0 },
+  ritualTitle: { color: palette.textPrimary, fontSize: 8, fontWeight: '700' },
+  ritualSchedule: { color: palette.textSecondary, fontSize: 7, marginTop: 3 },
+  editHabit: { color: palette.sage, fontSize: 16 },
+  ritualMeta: { color: palette.textSecondary, fontSize: 7, marginTop: spacing.xs },
+  ritualAction: { minHeight: 32, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, marginTop: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  ritualActionDone: { backgroundColor: palette.sage },
+  ritualActionDisabled: { opacity: 0.7 },
+  ritualActionText: { color: palette.sage, fontSize: 8, fontWeight: '700' },
+  ritualActionTextDone: { color: palette.surface },
+  emptyHabitsCard: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  emptyHabitsText: { color: palette.textSecondary, fontSize: 9 },
+  createHabitButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sage },
+  createHabitText: { color: palette.surface, fontSize: 9, fontWeight: '700' },
+  habitsFootnote: { color: palette.textSecondary, fontSize: 7, lineHeight: 11, marginTop: spacing.sm },
 });

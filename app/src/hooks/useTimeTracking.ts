@@ -37,6 +37,8 @@ export interface ActiveTimeSession {
   taskId: string | null;
   taskTitle: string | null;
   startedAtMs: number;
+  pausedAtMs?: number | null;
+  pausedSeconds?: number;
 }
 
 export interface TimeEntry {
@@ -113,6 +115,8 @@ export function useTimeTracking() {
         taskId: typeof timer.taskId === 'string' ? timer.taskId : null,
         taskTitle: typeof timer.taskTitle === 'string' ? timer.taskTitle : null,
         startedAtMs: timer.startedAtMs,
+        pausedAtMs: typeof timer.pausedAtMs === 'number' ? timer.pausedAtMs : null,
+        pausedSeconds: typeof timer.pausedSeconds === 'number' ? timer.pausedSeconds : 0,
       });
       setNow(Date.now());
     };
@@ -215,7 +219,14 @@ export function useTimeTracking() {
     if (!activeSession || isStopping) throw new Error('Aucun chronomètre en cours.');
     setIsStopping(true);
     const endedAtMs = Date.now();
-    const durationSeconds = Math.floor((endedAtMs - activeSession.startedAtMs) / 1000);
+    const currentPauseSeconds = activeSession.pausedAtMs
+      ? Math.floor((endedAtMs - activeSession.pausedAtMs) / 1000)
+      : 0;
+    const durationSeconds = Math.floor(
+      (endedAtMs - activeSession.startedAtMs) / 1000
+      - (activeSession.pausedSeconds ?? 0)
+      - currentPauseSeconds
+    );
     if (durationSeconds < 1) {
       setIsStopping(false);
       throw new Error('Laisse au moins une seconde au chronomètre pour enregistrer la session.');
@@ -265,18 +276,91 @@ export function useTimeTracking() {
     }
   };
 
+  const pauseTimer = async () => {
+    if (!userId || !activeSession || activeSession.pausedAtMs) return;
+    const pausedSession = { ...activeSession, pausedAtMs: Date.now() };
+    await AsyncStorage.setItem(activeSessionKey(userId), JSON.stringify(pausedSession));
+    setActiveSession(pausedSession);
+  };
+
+  const resumeTimer = async () => {
+    if (!userId || !activeSession?.pausedAtMs) return;
+    const resumedSession = {
+      ...activeSession,
+      pausedAtMs: null,
+      pausedSeconds: (activeSession.pausedSeconds ?? 0)
+        + Math.floor((Date.now() - activeSession.pausedAtMs) / 1000),
+    };
+    await AsyncStorage.setItem(activeSessionKey(userId), JSON.stringify(resumedSession));
+    setActiveSession(resumedSession);
+  };
+
+  const addManualEntry = async ({
+    category,
+    project,
+    durationSeconds,
+  }: {
+    category: TimeCategory;
+    project: string;
+    durationSeconds: number;
+  }) => {
+    if (!userId || !db) throw new Error('Connecte-toi pour enregistrer ton temps.');
+    if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 86400) {
+      throw new Error('La durée doit être comprise entre 1 minute et 24 heures.');
+    }
+
+    const endedAtMs = Date.now();
+    const entryId = `manual-${endedAtMs}-${Math.random().toString(36).slice(2, 8)}`;
+    const entry: TimeEntry = {
+      id: entryId,
+      category,
+      project: project.trim().slice(0, 100),
+      taskId: null,
+      taskTitle: null,
+      startedAt: Timestamp.fromMillis(endedAtMs - durationSeconds * 1000),
+      endedAt: Timestamp.fromMillis(endedAtMs),
+      durationSeconds,
+      userId,
+    };
+
+    await queueOfflineWrite({
+      collectionKey: 'timeEntries',
+      documentId: entryId,
+      path: `timeEntries/${entryId}`,
+      kind: 'set',
+      data: {
+        category: entry.category,
+        project: entry.project,
+        taskId: entry.taskId,
+        taskTitle: entry.taskTitle,
+        startedAt: entry.startedAt,
+        endedAt: entry.endedAt,
+        durationSeconds: entry.durationSeconds,
+        userId: entry.userId,
+      },
+    }, userId);
+    setEntries((currentEntries) => sortEntries([...currentEntries, entry]));
+  };
+
   return {
     entries: userId && loadedUserId === userId ? entries : [],
     activeSession: userId && timerLoadedUserId === userId ? activeSession : null,
     timerLoaded: !userId || timerLoadedUserId === userId,
     elapsedSeconds: activeSession
-      ? Math.max(0, Math.floor((now - activeSession.startedAtMs) / 1000))
+      ? Math.max(0, Math.floor(
+        ((activeSession.pausedAtMs ?? now) - activeSession.startedAtMs) / 1000
+        - (activeSession.pausedSeconds ?? 0)
+      ))
       : 0,
+    isPaused: Boolean(activeSession?.pausedAtMs),
     loading,
     error,
     isStarting,
     isStopping,
     startTimer,
+    pauseTimer,
+    resumeTimer,
     stopTimer,
+    addManualEntry,
   };
 }

@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { DatePickerField } from '@/components/DatePickerField';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
@@ -43,7 +44,8 @@ function getCalendarCells(month: Date) {
   const offset = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
   const dayCount = new Date(year, monthIndex + 1, 0).getDate();
 
-  return Array.from({ length: 42 }, (_, index) => {
+  const cellCount = offset + dayCount <= 35 ? 35 : 42;
+  return Array.from({ length: cellCount }, (_, index) => {
     const day = index - offset + 1;
     return day > 0 && day <= dayCount ? new Date(year, monthIndex, day) : null;
   });
@@ -62,6 +64,13 @@ function getPriorityLabel(task: TodoTask) {
   if (task.priority === 'urgent') return 'Urgente';
   if (task.priority === 'important') return 'Importante';
   return 'Normale';
+}
+
+function getTaskEndTime(task: TodoTask) {
+  if (!task.startTime) return null;
+  const [hours, minutes] = task.startTime.split(':').map(Number);
+  const end = hours * 60 + minutes + (task.durationMinutes ?? 60);
+  return `${String(Math.floor(end / 60) % 24).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
 }
 
 function isValidDate(value: string) {
@@ -101,12 +110,19 @@ export default function CalendarScreen() {
   const [taskError, setTaskError] = useState('');
   const [savingTask, setSavingTask] = useState(false);
   const [showDayTimeline, setShowDayTimeline] = useState(false);
+  const [calendarView, setCalendarView] = useState<'month' | 'day'>('month');
   const cells = useMemo(() => getCalendarCells(month), [month]);
   const selectedDateObject = new Date(`${selectedDate}T00:00:00`);
   const selectedHabits = allHabits.filter((habit) =>
     habit.frequencyDays.includes(selectedDateObject.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6)
   );
-  const selectedTasks = tasks.filter((task) => task.dueDate === selectedDate);
+  const selectedTasks = tasks
+    .filter((task) => task.dueDate === selectedDate)
+    .sort((left, right) => {
+      if (!left.startTime) return right.startTime ? 1 : 0;
+      if (!right.startTime) return -1;
+      return left.startTime.localeCompare(right.startTime);
+    });
   const monthLabel = formatMonth(month);
   const selectedDateLabel = selectedDate === todayKey
     ? 'Aujourd’hui'
@@ -217,15 +233,39 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.brandLine}>
-          <Text style={styles.brand}>nid</Text>
-          <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-        </View>
+        <BrandHeader
+          trailing={
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/tasks')}
+              style={styles.calendarShortcut}>
+              <Text style={styles.calendarShortcutText}>Mes petits pas</Text>
+            </Pressable>
+          }
+        />
         <Text style={styles.eyebrow}>MES REPÈRES</Text>
         <Text style={styles.title}>Mon calendrier</Text>
-        <Text style={styles.subtitle}>Un aperçu doux de ce qui compte, jour après jour.</Text>
+        <Text style={styles.subtitle}>Un peu de place pour chaque chose.</Text>
 
-        <View style={styles.calendarCard}>
+        <View style={styles.viewSwitch}>
+          {(['month', 'day'] as const).map((view) => {
+            const selected = calendarView === view;
+            return (
+              <Pressable
+                key={view}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => setCalendarView(view)}
+                style={[styles.viewSwitchOption, selected && styles.viewSwitchOptionSelected]}>
+                <Text style={[styles.viewSwitchText, selected && styles.viewSwitchTextSelected]}>
+                  {view === 'month' ? 'Mois' : 'Journée'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {calendarView === 'month' ? <View style={styles.calendarCard}>
           <View style={styles.monthHeader}>
             <Pressable
               accessibilityRole="button"
@@ -290,11 +330,13 @@ export default function CalendarScreen() {
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={[styles.indicator, styles.taskIndicator]} />
-              <Text style={styles.legendText}>Petits pas</Text>
+              <Text style={styles.legendText}>Tâche planifiée</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.indicator, styles.habitIndicator]} />
-              <Text style={styles.legendText}>Habitudes prévues</Text>
+              <Text style={styles.legendText}>
+                {selectedTasks.length} petit{selectedTasks.length === 1 ? '' : 's'} pas et {selectedHabits.length} habitude{selectedHabits.length === 1 ? '' : 's'}
+              </Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -306,12 +348,53 @@ export default function CalendarScreen() {
               <Text style={styles.todayLink}>Aujourd’hui</Text>
             </Pressable>
           </View>
-        </View>
+        </View> : (
+          <View style={styles.selectedDayCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Jour précédent"
+              onPress={() => {
+                const date = new Date(`${selectedDate}T00:00:00`);
+                date.setDate(date.getDate() - 1);
+                setSelectedDate(getDateKey(date));
+                setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+              }}
+              style={styles.monthArrow}>
+              <Text style={styles.monthArrowText}>‹</Text>
+            </Pressable>
+            <View style={styles.selectedDayCopy}>
+              <Text style={styles.monthTitle}>{selectedDateObject.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              })}</Text>
+              <Text style={styles.legendText}>
+                {selectedTasks.length} petit{selectedTasks.length === 1 ? '' : 's'} pas · {selectedHabits.length} habitude{selectedHabits.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Jour suivant"
+              onPress={() => {
+                const date = new Date(`${selectedDate}T00:00:00`);
+                date.setDate(date.getDate() + 1);
+                setSelectedDate(getDateKey(date));
+                setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+              }}
+              style={styles.monthArrow}>
+              <Text style={styles.monthArrowText}>›</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionTitle}>{selectedDateLabel}</Text>
-            <Text style={styles.sectionSubtitle}>Tes petits pas pour cette journée.</Text>
+            <Text style={styles.sectionTitle}>
+              {selectedDateLabel === 'Aujourd’hui'
+                ? 'Aujourd’hui'
+                : selectedDateLabel.charAt(0).toUpperCase() + selectedDateLabel.slice(1)}
+            </Text>
+            <Text style={styles.sectionSubtitle}>Vue de journée · {selectedTasks.length} tâche{selectedTasks.length === 1 ? '' : 's'} et {selectedHabits.length} habitude{selectedHabits.length === 1 ? '' : 's'}</Text>
           </View>
           <View style={styles.dayActions}>
             <Pressable
@@ -320,15 +403,8 @@ export default function CalendarScreen() {
               onPress={() => setShowDayTimeline((value) => !value)}
               style={[styles.timelineButton, showDayTimeline && styles.timelineButtonSelected]}>
               <Text style={[styles.timelineButtonText, showDayTimeline && styles.timelineButtonTextSelected]}>
-                {showDayTimeline ? 'Montrer la liste' : 'Vue horaire'}
+                {showDayTimeline ? 'Liste' : 'Organiser les heures'}
               </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter un petit pas"
-              onPress={openTaskModal}
-              style={styles.addTaskButton}>
-              <Text style={styles.addTaskButtonText}>＋</Text>
             </Pressable>
           </View>
         </View>
@@ -348,37 +424,45 @@ export default function CalendarScreen() {
         ) : null}
 
         {!showDayTimeline ? selectedTasks.map((task) => (
-          <View key={task.id} style={styles.dayItem}>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityLabel={task.completed ? `Rouvrir ${task.title}` : `Terminer ${task.title}`}
-              accessibilityState={{ checked: task.completed }}
-              onPress={() => void handleTaskToggle(task)}
-              style={[styles.checkbox, task.completed && styles.checkboxDone]}>
-              {task.completed ? <Text style={styles.checkmark}>✓</Text> : null}
-            </Pressable>
-            <View style={styles.itemCopy}>
-              <Text style={[styles.itemTitle, task.completed && styles.itemTitleDone]}>
-                {task.title}
-              </Text>
-              <Text style={styles.itemMeta}>
-                {task.description || `Priorité ${getPriorityLabel(task).toLowerCase()}`}
-              </Text>
+          <View key={task.id} style={styles.agendaRow}>
+            <View style={styles.agendaTime}>
+              <Text style={styles.agendaTimeStart}>{task.startTime ?? 'À placer'}</Text>
+              {getTaskEndTime(task) ? (
+                <Text style={styles.agendaTimeEnd}>{getTaskEndTime(task)}</Text>
+              ) : null}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Modifier ${task.title}`}
-              onPress={() => openEditTaskModal(task)}
-              style={styles.taskAction}>
-              <Text style={styles.taskEditIcon}>✎</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Supprimer ${task.title}`}
-              onPress={() => confirmDeleteTask(task)}
-              style={styles.taskAction}>
-              <Text style={styles.taskDeleteIcon}>×</Text>
-            </Pressable>
+            <View style={styles.dayItem}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel={task.completed ? `Rouvrir ${task.title}` : `Terminer ${task.title}`}
+                accessibilityState={{ checked: task.completed }}
+                onPress={() => void handleTaskToggle(task)}
+                style={[styles.checkbox, task.completed && styles.checkboxDone]}>
+                {task.completed ? <Text style={styles.checkmark}>✓</Text> : null}
+              </Pressable>
+              <View style={styles.itemCopy}>
+                <Text style={[styles.itemTitle, task.completed && styles.itemTitleDone]}>
+                  {task.title}
+                </Text>
+                <Text style={styles.itemMeta}>
+                  {task.description || `Tâche · ${getPriorityLabel(task).toLowerCase()}`}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Modifier ${task.title}`}
+                onPress={() => openEditTaskModal(task)}
+                style={styles.taskAction}>
+                <Text style={styles.taskEditIcon}>✎</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Supprimer ${task.title}`}
+                onPress={() => confirmDeleteTask(task)}
+                style={styles.taskAction}>
+                <Text style={styles.taskDeleteIcon}>×</Text>
+              </Pressable>
+            </View>
           </View>
         )) : null}
 
@@ -393,39 +477,48 @@ export default function CalendarScreen() {
               : `${progress} / ${habit.goalTarget} ${habit.goalUnit}`;
 
             return (
-              <View key={habit.id} style={styles.dayItem}>
+              <View key={habit.id} style={styles.agendaRow}>
+                <View style={styles.agendaTime}>
+                  <Text style={styles.agendaTimeStart}>Hab.</Text>
+                </View>
+                <View style={styles.dayItem}>
+                  <View style={[styles.checkbox, completed && styles.checkboxDone, styles.roundCheckbox]}>
+                    {completed ? <Text style={styles.checkmark}>✓</Text> : null}
+                  </View>
+                  <View style={styles.itemCopy}>
+                    <Text style={[styles.itemTitle, completed && styles.itemTitleDone]}>{habit.title}</Text>
+                    <Text style={styles.itemMeta}>
+                      {progressLabel} · {completed ? 'Objectif atteint' : canComplete ? 'À ton rythme' : 'Prévue'}
+                    </Text>
+                  </View>
+                  <Text style={styles.itemType}>HABITUDE</Text>
+                </View>
+              </View>
+            );
+          }
+
+          return (
+            <View key={habit.id} style={styles.agendaRow}>
+              <View style={styles.agendaTime}>
+                <Text style={styles.agendaTimeStart}>Hab.</Text>
+              </View>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: completed, disabled: !canComplete }}
+                onPress={() => canComplete && void handleHabitToggle(habit.id)}
+                style={[styles.dayItem, !canComplete && styles.dayItemDisabled]}>
                 <View style={[styles.checkbox, completed && styles.checkboxDone, styles.roundCheckbox]}>
                   {completed ? <Text style={styles.checkmark}>✓</Text> : null}
                 </View>
                 <View style={styles.itemCopy}>
                   <Text style={[styles.itemTitle, completed && styles.itemTitleDone]}>{habit.title}</Text>
                   <Text style={styles.itemMeta}>
-                    {progressLabel} · {completed ? 'Objectif atteint' : canComplete ? 'À ton rythme' : 'Prévue'}
+                    {canComplete ? `${habit.streak} jour${habit.streak === 1 ? '' : 's'} de régularité` : 'Prévue'}
                   </Text>
                 </View>
                 <Text style={styles.itemType}>HABITUDE</Text>
-              </View>
-            );
-          }
-
-          return (
-            <Pressable
-              key={habit.id}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: completed, disabled: !canComplete }}
-              onPress={() => canComplete && void handleHabitToggle(habit.id)}
-              style={[styles.dayItem, !canComplete && styles.dayItemDisabled]}>
-              <View style={[styles.checkbox, completed && styles.checkboxDone, styles.roundCheckbox]}>
-                {completed ? <Text style={styles.checkmark}>✓</Text> : null}
-              </View>
-              <View style={styles.itemCopy}>
-                <Text style={[styles.itemTitle, completed && styles.itemTitleDone]}>{habit.title}</Text>
-                <Text style={styles.itemMeta}>
-                  {canComplete ? `${habit.streak} jour${habit.streak === 1 ? '' : 's'} de régularité` : 'Prévue'}
-                </Text>
-              </View>
-              <Text style={styles.itemType}>HABITUDE</Text>
-            </Pressable>
+              </Pressable>
+            </View>
           );
         })}
 
@@ -436,6 +529,13 @@ export default function CalendarScreen() {
             <Text style={styles.emptyText}>Aucune tâche ni habitude prévue ici.</Text>
           </View>
         ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={openTaskModal}
+          style={({ pressed }) => [styles.planTaskButton, pressed && styles.pressed]}>
+          <Text style={styles.planTaskButtonText}>＋  Planifier un petit pas</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -468,7 +568,7 @@ export default function CalendarScreen() {
           <Text style={styles.premiumNote}>Voir mes bilans et objectifs  ›</Text>
         </Pressable>
       </ScrollView>
-      <BottomNavigation active="calendar" />
+      <BottomNavigation active="tasks" />
 
       <Modal
         visible={isTaskModalVisible}
@@ -572,6 +672,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
   },
+  calendarShortcut: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: borderRadius.extraLarge,
+    backgroundColor: palette.sagePale,
+  },
+  calendarShortcutText: { color: palette.sage, fontSize: 9, fontWeight: '700' },
   brandLine: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,14 +715,55 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: spacing.xs,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  viewSwitch: {
+    flexDirection: 'row',
+    padding: 3,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.extraLarge,
+    backgroundColor: palette.sagePale,
+  },
+  viewSwitchOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    borderRadius: borderRadius.extraLarge,
+  },
+  viewSwitchOptionSelected: {
+    backgroundColor: palette.sage,
+  },
+  viewSwitchText: {
+    color: palette.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  viewSwitchTextSelected: {
+    color: palette.surface,
   },
   calendarCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
     borderRadius: borderRadius.large,
     borderWidth: 1,
-    padding: spacing.md,
+    padding: spacing.sm,
+  },
+  selectedDayCard: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.medium,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  selectedDayCopy: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
   },
   monthHeader: {
     alignItems: 'center',
@@ -659,7 +807,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   dayCell: {
     alignItems: 'center',
     borderRadius: 13,
-    height: 46,
+    height: 34,
     justifyContent: 'center',
     width: `${100 / 7}%`,
   },
@@ -724,7 +872,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
   sectionTitle: {
@@ -791,9 +939,29 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
+    flex: 1,
+    minHeight: 58,
+    paddingHorizontal: spacing.sm,
+  },
+  agendaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.xs,
-    minHeight: 62,
-    paddingHorizontal: spacing.md,
+  },
+  agendaTime: {
+    width: 42,
+    alignItems: 'flex-start',
+  },
+  agendaTimeStart: {
+    color: palette.textPrimary,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  agendaTimeEnd: {
+    color: palette.textSecondary,
+    fontSize: 8,
+    marginTop: 3,
   },
   dayItemDisabled: {
     opacity: 0.75,
@@ -880,6 +1048,23 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: 10,
     marginTop: spacing.xs,
     textAlign: 'center',
+  },
+  planTaskButton: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.extraLarge,
+    backgroundColor: palette.sage,
+  },
+  planTaskButtonText: {
+    color: palette.surface,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.75,
   },
   premiumCard: {
     backgroundColor: palette.sagePale,

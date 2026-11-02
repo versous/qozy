@@ -18,7 +18,10 @@ const defaultStatus: OfflineSyncStatus = {
   error: null,
 };
 
-export function OfflineSyncProvider({ children }: React.PropsWithChildren) {
+export function OfflineSyncProvider({
+  children,
+  showStatusBanner = true,
+}: React.PropsWithChildren<{ showStatusBanner?: boolean }>) {
   const { colors } = useAppTheme();
   const [userId, setUserId] = useState(auth?.currentUser?.uid ?? null);
 
@@ -53,7 +56,7 @@ export function OfflineSyncProvider({ children }: React.PropsWithChildren) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>{children}</View>
-      {message ? (
+      {message && showStatusBanner ? (
         <SafeAreaView edges={['bottom']} style={[styles.banner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.message, { color: status.error ? colors.error : colors.textSecondary }]}>
             {message}

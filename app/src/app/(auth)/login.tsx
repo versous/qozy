@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing, borderRadius, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { auth, isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -126,7 +127,7 @@ const AuthScreen = () => {
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Text style={styles.brand}>nid</Text>
+            <BrandHeader />
             <Text style={styles.title}>
               {isRegistering ? 'Créer votre compte' : 'Ravi de te retrouver'}
             </Text>

@@ -19,10 +19,14 @@ import {
   saveCachedDocuments,
 } from '@/services/offlineStore';
 
+export type ExerciseMode = 'timer' | 'repetitions';
+
 export interface Exercise {
   id: string;
   name: string;
   duration: number;
+  mode?: ExerciseMode;
+  targetReps?: number | null;
   intensity: string;
   equipment: string;
   note: string;
@@ -157,7 +161,14 @@ export function useExercises() {
     setExercises((current) => applyPendingWrites(current, [write]));
   };
 
-  const toggleToday = async (name: string, duration: number, intensity: string, equipment: string) => {
+  const toggleToday = async (
+    name: string,
+    duration: number,
+    intensity: string,
+    equipment: string,
+    mode: ExerciseMode = 'timer',
+    targetReps?: number
+  ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier votre routine.');
     const existing = exercises.find((exercise) => exercise.name === name);
     if (existing) {
@@ -189,6 +200,8 @@ export function useExercises() {
     await saveExercise({
       name,
       duration,
+      mode,
+      targetReps: mode === 'repetitions' ? targetReps ?? 1 : null,
       intensity,
       equipment,
       note: '',
@@ -232,11 +245,15 @@ export function useExercises() {
     equipment: string,
     note: string,
     addToToday: boolean,
-    routineDays: HabitDay[] = ALL_HABIT_DAYS
+    routineDays: HabitDay[] = ALL_HABIT_DAYS,
+    mode: ExerciseMode = 'timer',
+    targetReps?: number
   ) => {
     await saveExercise({
       name,
       duration,
+      mode,
+      targetReps: mode === 'repetitions' ? targetReps ?? 1 : null,
       intensity,
       equipment,
       note: note.trim(),
@@ -256,7 +273,9 @@ export function useExercises() {
     equipment: string,
     note: string,
     routineDays: HabitDay[],
-    routineEnabled: boolean
+    routineEnabled: boolean,
+    mode: ExerciseMode = 'timer',
+    targetReps?: number
   ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier un exercice.');
     const exercise = exercises.find((item) => item.id === exerciseId);
@@ -268,8 +287,11 @@ export function useExercises() {
     const trimmedEquipment = equipment.trim() || 'Sans matériel';
     const trimmedNote = note.trim();
     if (!trimmedName) throw new Error('Le nom de l’exercice ne peut pas être vide.');
-    if (!Number.isInteger(duration) || duration < 1 || duration > 180) {
+    if (mode === 'timer' && (!Number.isInteger(duration) || duration < 1 || duration > 180)) {
       throw new Error('Choisis une durée entre 1 et 180 minutes.');
+    }
+    if (mode === 'repetitions' && (!Number.isInteger(targetReps) || !targetReps || targetReps < 1 || targetReps > 1000)) {
+      throw new Error('Choisis un nombre de répétitions entre 1 et 1 000.');
     }
     if (routineEnabled && !routineDays.length) {
       throw new Error('Choisis au moins un jour pour ta routine.');
@@ -278,6 +300,8 @@ export function useExercises() {
     const updatedExercise = {
       name: trimmedName,
       duration,
+      mode,
+      targetReps: mode === 'repetitions' ? targetReps : null,
       intensity,
       equipment: trimmedEquipment,
       note: trimmedNote,

@@ -30,10 +30,59 @@ export type LocationReminder = {
   message: string;
 };
 
+export type ScheduledReminder = {
+  id: string;
+  title: string;
+  category: string;
+  message: string;
+  hour: number;
+  minute: number;
+  days: number[];
+  enabled: boolean;
+  notificationIds: string[];
+};
+
 export type ContextualReminders = {
   time: TimeReminder;
   location: LocationReminder;
+  schedules: ScheduledReminder[];
 };
+
+const defaultSchedules: ScheduledReminder[] = [
+  {
+    id: 'reading',
+    title: 'Mon moment de lecture',
+    category: 'Habitude · Lire 10 minutes',
+    message: 'Prends un petit moment pour lire, à ton rythme.',
+    hour: 8,
+    minute: 30,
+    days: [1, 2, 3, 4, 5],
+    enabled: false,
+    notificationIds: [],
+  },
+  {
+    id: 'hydration',
+    title: 'Une pause pour boire',
+    category: 'Hydratation · Notification douce',
+    message: 'Une petite pause pour boire un verre d’eau.',
+    hour: 15,
+    minute: 0,
+    days: [0, 1, 2, 3, 4, 5, 6],
+    enabled: false,
+    notificationIds: [],
+  },
+  {
+    id: 'breathing',
+    title: 'Respirer au calme',
+    category: 'Méditation · Respiration guidée',
+    message: 'Accorde-toi un instant pour respirer calmement.',
+    hour: 21,
+    minute: 30,
+    days: [1, 3, 5],
+    enabled: false,
+    notificationIds: [],
+  },
+];
 
 export const DEFAULT_REMINDERS: ContextualReminders = {
   time: {
@@ -49,6 +98,7 @@ export const DEFAULT_REMINDERS: ContextualReminders = {
     longitude: null,
     message: 'Tu es arrivé·e. Prends un instant pour toi.',
   },
+  schedules: defaultSchedules,
 };
 
 setNotificationHandler({
@@ -95,12 +145,33 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(GEOFENCE_TASK)) {
 
 export async function loadContextualReminders(): Promise<ContextualReminders> {
   const stored = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!stored) return DEFAULT_REMINDERS;
+  if (!stored) return {
+    ...DEFAULT_REMINDERS,
+    schedules: defaultSchedules.map((schedule) => ({ ...schedule, days: [...schedule.days] })),
+  };
 
   const parsed = JSON.parse(stored) as Partial<ContextualReminders>;
+  const legacyTime = { ...DEFAULT_REMINDERS.time, ...parsed.time };
+  const schedules = Array.isArray(parsed.schedules)
+    ? parsed.schedules.map((schedule) => ({
+      ...schedule,
+      days: Array.isArray(schedule.days) ? schedule.days : [],
+      notificationIds: Array.isArray(schedule.notificationIds) ? schedule.notificationIds : [],
+    }))
+    : defaultSchedules.map((schedule, index) => index === 0
+      ? {
+        ...schedule,
+        hour: legacyTime.hour,
+        minute: legacyTime.minute,
+        message: legacyTime.message,
+        enabled: legacyTime.enabled,
+        notificationIds: legacyTime.notificationId ? [legacyTime.notificationId] : [],
+      }
+      : { ...schedule, days: [...schedule.days] });
   return {
-    time: { ...DEFAULT_REMINDERS.time, ...parsed.time },
+    time: legacyTime,
     location: { ...DEFAULT_REMINDERS.location, ...parsed.location },
+    schedules,
   };
 }
 
@@ -171,6 +242,136 @@ export async function saveTimeReminder(
   }
   updated.time.notificationId = null;
   await saveContextualReminders(updated);
+  return updated;
+}
+
+export async function saveScheduledReminder(
+  current: ContextualReminders,
+  reminder: ScheduledReminder
+): Promise<ContextualReminders> {
+  const title = reminder.title.trim();
+  const message = reminder.message.trim();
+  if (!title) throw new Error('Donne un nom à ce rappel.');
+  if (!message) throw new Error('Ajoute un petit message à ce rappel.');
+  if (!Number.isInteger(reminder.hour) || reminder.hour < 0 || reminder.hour > 23
+    || !Number.isInteger(reminder.minute) || reminder.minute < 0 || reminder.minute > 59) {
+    throw new Error('Choisis une heure valide.');
+  }
+  const days = [...new Set(reminder.days)].filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+  if (!days.length) throw new Error('Choisis au moins un jour.');
+
+  const existing = current.schedules.find((item) => item.id === reminder.id);
+  let notificationIds: string[] = [];
+  if (reminder.enabled) {
+    await ensureNotificationPermission();
+    if (Platform.OS === 'android') {
+      await setNotificationChannelAsync(ANDROID_CHANNEL, {
+        name: 'Rappels doux',
+        importance: AndroidImportance.DEFAULT,
+        sound: null,
+      });
+    }
+
+    try {
+      for (const day of days) {
+        notificationIds.push(await scheduleNotificationAsync({
+          content: {
+            title,
+            body: message,
+            sound: false,
+            ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL } : {}),
+          },
+          trigger: {
+            type: SchedulableTriggerInputTypes.WEEKLY,
+            weekday: day === 0 ? 1 : day + 1,
+            hour: reminder.hour,
+            minute: reminder.minute,
+            ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL } : {}),
+          },
+        }));
+      }
+    } catch (error) {
+      await Promise.all(notificationIds.map((id) => cancelScheduledNotificationAsync(id)));
+      throw error;
+    }
+  }
+
+  const updatedSchedules = current.schedules.some((item) => item.id === reminder.id)
+    ? current.schedules.map((item) => item.id === reminder.id
+      ? { ...reminder, title, message, days, notificationIds }
+      : item)
+    : [...current.schedules, { ...reminder, title, message, days, notificationIds }];
+  const legacyTime = updatedSchedules[0]
+    ? {
+      ...current.time,
+      enabled: updatedSchedules[0].enabled,
+      hour: updatedSchedules[0].hour,
+      minute: updatedSchedules[0].minute,
+      message: updatedSchedules[0].message,
+      notificationId: updatedSchedules[0].notificationIds[0] ?? null,
+    }
+    : current.time;
+  const updated = { ...current, time: legacyTime, schedules: updatedSchedules };
+  try {
+    await saveContextualReminders(updated);
+  } catch (error) {
+    await Promise.all(notificationIds.map((id) => cancelScheduledNotificationAsync(id)));
+    throw error;
+  }
+  if (existing?.notificationIds.length) {
+    await Promise.all(existing.notificationIds.map((id) => cancelScheduledNotificationAsync(id)));
+  }
+  return updated;
+}
+
+export async function saveHabitReminder(
+  habitId: string,
+  title: string,
+  days: number[],
+  time: string,
+  enabled: boolean
+) {
+  const [hour, minute] = time.split(':').map(Number);
+  const current = await loadContextualReminders();
+  const reminderId = `habit:${habitId}`;
+  const existing = current.schedules.find((schedule) => schedule.id === reminderId);
+  return saveScheduledReminder(current, {
+    id: reminderId,
+    title: `Ton rituel · ${title}`,
+    category: 'Habitude · Rituel personnalisé',
+    message: `C’est le moment de prendre soin de ton rituel « ${title} », à ton rythme.`,
+    hour,
+    minute,
+    days,
+    enabled,
+    notificationIds: existing?.notificationIds ?? [],
+  });
+}
+
+export async function deleteScheduledReminder(
+  current: ContextualReminders,
+  reminderId: string
+): Promise<ContextualReminders> {
+  const reminder = current.schedules.find((item) => item.id === reminderId);
+  const schedules = current.schedules.filter((item) => item.id !== reminderId);
+  const updated = {
+    ...current,
+    schedules,
+    time: schedules[0]
+      ? {
+        ...current.time,
+        enabled: schedules[0].enabled,
+        hour: schedules[0].hour,
+        minute: schedules[0].minute,
+        message: schedules[0].message,
+        notificationId: schedules[0].notificationIds[0] ?? null,
+      }
+      : { ...current.time, enabled: false, notificationId: null },
+  };
+  await saveContextualReminders(updated);
+  if (reminder?.notificationIds.length) {
+    await Promise.all(reminder.notificationIds.map((id) => cancelScheduledNotificationAsync(id)));
+  }
   return updated;
 }
 

@@ -53,8 +53,8 @@ export const spacing = {
 };
 
 export const borderRadius = {
-  small: 8,
-  medium: 16,
+  small: 12,
+  medium: 18,
   large: 24,
   extraLarge: 32, // Pour l'aspect très arrondi et organique
 };

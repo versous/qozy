@@ -34,6 +34,8 @@ export interface Habit {
   goalUnit: string;
   icon: string;
   frequencyDays: HabitDay[];
+  scheduledTime?: string | null;
+  reminderEnabled?: boolean;
   userId: string;
   createdAt: Timestamp;
 }
@@ -59,6 +61,8 @@ interface HabitDocument {
   goalType?: unknown;
   goalTarget?: unknown;
   goalUnit?: unknown;
+  scheduledTime?: unknown;
+  reminderEnabled?: unknown;
   createdAt?: Timestamp;
 }
 
@@ -212,6 +216,8 @@ export const useHabits = () => {
             goalUnit,
             icon: habit.icon ?? '🌱',
             frequencyDays,
+            scheduledTime: typeof habit.scheduledTime === 'string' ? habit.scheduledTime : null,
+            reminderEnabled: habit.reminderEnabled === true,
             createdAt: habit.createdAt ?? Timestamp.now(),
           };
         }));
@@ -310,7 +316,8 @@ export const useHabits = () => {
     title: string,
     icon = '🌱',
     frequencyDays: HabitDay[] = ALL_HABIT_DAYS,
-    goal: HabitGoal = { type: 'check', target: 1, unit: 'fois' }
+    goal: HabitGoal = { type: 'check', target: 1, unit: 'fois' },
+    ritual: { scheduledTime?: string | null; reminderEnabled?: boolean } = {}
   ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour ajouter une habitude.');
     const trimmedTitle = title.trim();
@@ -336,6 +343,8 @@ export const useHabits = () => {
         goalType: goal.type,
         goalTarget: goal.type === 'check' ? 1 : goal.target,
         goalUnit: normalizeGoalUnit(goal.unit, goal.type),
+        scheduledTime: ritual.scheduledTime ?? null,
+        reminderEnabled: ritual.reminderEnabled ?? false,
         userId,
         createdAt: Timestamp.now(),
       },
@@ -354,14 +363,18 @@ export const useHabits = () => {
       goalUnit: normalizeGoalUnit(habit.goalUnit, normalizeGoalType(habit.goalType)),
       icon: habit.icon ?? '🌱',
       createdAt: habit.createdAt ?? Timestamp.now(),
+      scheduledTime: typeof habit.scheduledTime === 'string' ? habit.scheduledTime : null,
+      reminderEnabled: habit.reminderEnabled === true,
     })));
+    return habitId;
   };
 
   const updateHabit = async (
     habitId: string,
     title: string,
     frequencyDays: HabitDay[],
-    goal: HabitGoal
+    goal: HabitGoal,
+    ritual: { scheduledTime?: string | null; reminderEnabled?: boolean } = {}
   ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier une habitude.');
     const habit = habits.find((item) => item.id === habitId);
@@ -392,6 +405,8 @@ export const useHabits = () => {
       goalType: goal.type,
       goalTarget: goal.type === 'check' ? 1 : goal.target,
       goalUnit: normalizeGoalUnit(goal.unit, goal.type),
+      ...(ritual.scheduledTime !== undefined ? { scheduledTime: ritual.scheduledTime } : {}),
+      ...(ritual.reminderEnabled !== undefined ? { reminderEnabled: ritual.reminderEnabled } : {}),
     };
     const write = await queueOfflineWrite({
       collectionKey: 'habits',
@@ -425,8 +440,32 @@ export const useHabits = () => {
         goalUnit: normalizeGoalUnit(item.goalUnit, normalizeGoalType(item.goalType)),
         icon: item.icon ?? '🌱',
         createdAt: item.createdAt ?? Timestamp.now(),
+        scheduledTime: typeof item.scheduledTime === 'string' ? item.scheduledTime : null,
+        reminderEnabled: item.reminderEnabled === true,
       };
     }));
+  };
+
+  const setHabitRitual = async (
+    habitId: string,
+    ritual: { scheduledTime: string | null; reminderEnabled: boolean }
+  ) => {
+    if (!db || !userId) throw new Error('Connectez-vous pour enregistrer ce rituel.');
+    if (ritual.scheduledTime !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(ritual.scheduledTime)) {
+      throw new Error('Choisis une heure valide pour ce rituel.');
+    }
+    const write = await queueOfflineWrite({
+      collectionKey: 'habits',
+      documentId: habitId,
+      path: `habits/${habitId}`,
+      kind: 'update',
+      data: ritual,
+    }, userId);
+    setHabits((current) => applyPendingWrites(current, [write]).map((habit) => ({
+      ...habit,
+      scheduledTime: typeof habit.scheduledTime === 'string' ? habit.scheduledTime : null,
+      reminderEnabled: habit.reminderEnabled === true,
+    })));
   };
 
   const toggleHabitForDate = async (habitId: string, date: string) => {
@@ -601,6 +640,7 @@ export const useHabits = () => {
     error,
     addHabit,
     updateHabit,
+    setHabitRitual,
     toggleHabit,
     toggleHabitForDate,
     updateHabitProgress,

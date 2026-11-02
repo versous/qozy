@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
 import { Exercise, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
@@ -34,16 +35,25 @@ export default function MovementScreen() {
     }
   };
 
+  const startExercise = (exercise: Exercise) => router.push({
+    pathname: '/activity-ready',
+    params: {
+      activity: exercise.name,
+      minutes: String(exercise.duration),
+      category: 'sport',
+      ...(exercise.mode === 'repetitions'
+        ? { repetitions: String(exercise.targetReps ?? 1), exerciseId: exercise.id }
+        : {}),
+    },
+  });
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
           <Text style={styles.backText}>‹  Mes petits pas</Text>
         </Pressable>
-        <View style={styles.brandLine}>
-          <Text style={styles.brand}>nid</Text>
-          <Text style={styles.brandCaption}>À VOTRE RYTHME</Text>
-        </View>
+        <BrandHeader />
         <Text style={styles.eyebrow}>AUJOURD’HUI · {formatDate}</Text>
         <Text style={styles.title}>Exercice</Text>
         <Text style={styles.subtitle}>Bouger un peu, se faire du bien.</Text>
@@ -87,18 +97,27 @@ export default function MovementScreen() {
           return (
             <View key={exercise.id} style={styles.exerciseCard}>
               <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isDone }}
-                accessibilityLabel={`${isDone ? 'Décocher' : 'Cocher'} ${exercise.name}`}
-                onPress={() => void handleToggle(exercise)}
+                accessibilityRole="button"
+                accessibilityLabel={exercise.mode === 'repetitions'
+                  ? `Commencer ${exercise.name}`
+                  : `${isDone ? 'Décocher' : 'Cocher'} ${exercise.name}`}
+                accessibilityState={exercise.mode === 'repetitions' ? undefined : { checked: isDone }}
+                onPress={() => void (exercise.mode === 'repetitions' ? startExercise(exercise) : handleToggle(exercise))}
                 style={styles.exerciseAction}>
                 <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
-                  {isDone ? <Text style={styles.checkmark}>✓</Text> : null}
+                  {isDone
+                    ? <Text style={styles.checkmark}>✓</Text>
+                    : exercise.mode === 'repetitions'
+                      ? <Text style={styles.startIcon}>▷</Text>
+                      : null}
                 </View>
                 <View style={styles.exerciseCopy}>
                   <Text style={[styles.exerciseName, isDone && styles.exerciseNameDone]}>{exercise.name}</Text>
                   <Text style={styles.exerciseMeta}>
-                    {exercise.duration} min · {exercise.intensity} · {isDone ? 'Terminé' : exercise.equipment}
+                    {exercise.mode === 'repetitions'
+                      ? `${exercise.targetReps ?? 1} répétitions`
+                      : `${exercise.duration} min`}
+                    {' · '}{exercise.intensity} · {isDone ? 'Terminé' : exercise.equipment}
                   </Text>
                 </View>
               </Pressable>
@@ -129,15 +148,10 @@ export default function MovementScreen() {
 
         {nextExercise ? (
           <CosyButton
-            title={`▷  Faire mon prochain exercice · ${nextExercise.duration} min`}
-            onPress={() => router.push({
-              pathname: '/activity-ready',
-              params: {
-                activity: nextExercise.name,
-                minutes: String(nextExercise.duration),
-                category: 'sport',
-              },
-            })}
+            title={nextExercise.mode === 'repetitions'
+              ? `▷  Faire mon prochain exercice · ${nextExercise.targetReps ?? 1} répétitions`
+              : `▷  Faire mon prochain exercice · ${nextExercise.duration} min`}
+            onPress={() => startExercise(nextExercise)}
             style={styles.primaryButton}
           />
         ) : null}
@@ -197,6 +211,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   checkbox: { width: 21, height: 21, borderRadius: 7, borderWidth: 1, borderColor: palette.sage, alignItems: 'center', justifyContent: 'center' },
   checkboxDone: { backgroundColor: palette.sage },
   checkmark: { color: palette.surface, fontSize: 13, fontWeight: '700' },
+  startIcon: { color: palette.sage, fontSize: 10, fontWeight: '700' },
   exerciseCopy: { flex: 1 },
   exerciseName: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },
   exerciseNameDone: { color: palette.textSecondary, textDecorationLine: 'line-through' },

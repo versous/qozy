@@ -151,6 +151,8 @@ interface MusicContextValue {
   isPlaying: boolean;
   isLoaded: boolean;
   isBuffering: boolean;
+  currentTime: number;
+  duration: number;
   isPremium: boolean;
   premiumTrackCount: number;
   selectTrack: (trackId: string) => void;
@@ -352,6 +354,8 @@ export function MusicProvider({
       isPlaying: lofiPlaying,
       isLoaded: lofiLoaded,
       isBuffering: lofiBuffering,
+      currentTime: lofiStatus.currentTime,
+      duration: lofiStatus.duration,
       isPremium,
       premiumTrackCount: lofiTracks.length - 2,
       selectTrack: selectLofiTrack,
@@ -364,6 +368,8 @@ export function MusicProvider({
     availableLofiTracks,
     isPremium,
     lofiBuffering,
+    lofiStatus.currentTime,
+    lofiStatus.duration,
     lofiIndex,
     lofiLoaded,
     lofiPlayer,
@@ -385,6 +391,8 @@ export function MusicProvider({
       isPlaying: meditationPlaying,
       isLoaded: meditationLoaded,
       isBuffering: meditationBuffering,
+      currentTime: meditationStatus.currentTime,
+      duration: meditationStatus.duration,
       isPremium,
       premiumTrackCount: meditationTracks.length - 2,
       selectTrack: selectMeditationTrack,
@@ -397,6 +405,8 @@ export function MusicProvider({
       availableMeditationTracks,
       isPremium,
       meditationBuffering,
+      meditationStatus.currentTime,
+      meditationStatus.duration,
       meditationIndex,
       meditationLoaded,
       meditationPlayer,
@@ -418,6 +428,8 @@ export function MusicProvider({
     isPlaying: sportPlaying,
     isLoaded: sportLoaded,
     isBuffering: sportBuffering,
+    currentTime: sportStatus.currentTime,
+    duration: sportStatus.duration,
     isPremium,
     premiumTrackCount: 0,
     selectTrack: () => {},
@@ -427,7 +439,7 @@ export function MusicProvider({
     togglePlayback: () => sportPlaying ? pauseSport() : playSport(),
   }), [
     isPremium, pauseSport, playSport, sportBuffering, sportIndex, sportLoaded,
-    sportPlayer, sportPlaying,
+    sportPlayer, sportPlaying, sportStatus.currentTime, sportStatus.duration,
   ]);
   const values = useMemo(
     () => ({ lofi, meditation, sport, requestMeditation, requestSport }),

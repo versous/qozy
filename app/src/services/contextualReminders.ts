@@ -348,6 +348,35 @@ export async function saveHabitReminder(
   });
 }
 
+export async function saveExerciseReminder(
+  exerciseId: string,
+  title: string,
+  days: number[],
+  time: string,
+  enabled: boolean
+) {
+  const [hour, minute] = time.split(':').map(Number);
+  const current = await loadContextualReminders();
+  const reminderId = `exercise:${exerciseId}`;
+  const existing = current.schedules.find((schedule) => schedule.id === reminderId);
+  return saveScheduledReminder(current, {
+    id: reminderId,
+    title: `Ton exercice · ${title}`,
+    category: 'Exercice · Rappel personnalisé',
+    message: `C’est le moment de bouger avec « ${title} », à ton rythme.`,
+    hour,
+    minute,
+    days,
+    enabled,
+    notificationIds: existing?.notificationIds ?? [],
+  });
+}
+
+export async function deleteExerciseReminder(exerciseId: string) {
+  const current = await loadContextualReminders();
+  return deleteScheduledReminder(current, `exercise:${exerciseId}`);
+}
+
 export async function deleteScheduledReminder(
   current: ContextualReminders,
   reminderId: string

@@ -12,11 +12,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, type Href } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
+import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
@@ -37,7 +38,8 @@ const todayLabel = new Date().toLocaleDateString('fr-FR', { weekday: 'long' }).t
 export default function TasksScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const { habits, allHabits, loading, error, addHabit, updateHabit, toggleHabit, updateHabitProgress } = useHabits();
+  const { createHabit } = useLocalSearchParams<{ createHabit?: string }>();
+  const { habits, allHabits, loading, error, addHabit, updateHabit, toggleHabit, updateHabitProgress, deleteHabit } = useHabits();
   const {
     tasks,
     loading: tasksLoading,
@@ -55,7 +57,17 @@ export default function TasksScreen() {
   const [habitGoalUnit, setHabitGoalUnit] = useState('pages');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
-  const dismissHabitSheet = useCallback(() => setIsAdding(false), [setIsAdding]);
+  const [taskToDelete, setTaskToDelete] = useState<TodoTask | null>(null);
+  const [deleteActionTaskId, setDeleteActionTaskId] = useState<string | null>(null);
+  const [deleteActionHabitId, setDeleteActionHabitId] = useState<string | null>(null);
+  const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [deletingTask, setDeletingTask] = useState(false);
+  const habitModalVisible = isAdding || createHabit === 'true';
+  const dismissHabitSheet = useCallback(() => {
+    setIsAdding(false);
+    if (createHabit === 'true') router.setParams({ createHabit: undefined });
+  }, [createHabit]);
   const pending = habits.filter((habit) => !habit.isCompleted);
   const completed = habits.filter((habit) => habit.isCompleted);
   const visibleHabits = filter === 'active' ? pending : filter === 'done' ? completed : habits;
@@ -75,21 +87,23 @@ export default function TasksScreen() {
   };
 
   const confirmDeleteTask = (task: TodoTask) => {
-    Alert.alert('Supprimer cette tâche ?', task.title, [
-      { text: 'Garder', style: 'cancel' },
-      {
-        text: 'Supprimer',
-        style: 'destructive',
-        onPress: () => {
-          void deleteTask(task.id).catch((reason) => {
-            Alert.alert(
-              'Suppression impossible',
-              reason instanceof Error ? reason.message : 'Réessaie plus tard.'
-            );
-          });
-        },
-      },
-    ]);
+    setDeleteError('');
+    setDeleteActionTaskId(null);
+    setTaskToDelete(task);
+  };
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setDeletingTask(true);
+    setDeleteError('');
+    try {
+      await deleteTask(taskToDelete.id);
+      setTaskToDelete(null);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : 'Impossible de supprimer cette tâche.');
+    } finally {
+      setDeletingTask(false);
+    }
   };
 
   const saveHabit = async () => {
@@ -114,6 +128,7 @@ export default function TasksScreen() {
       setHabitGoalUnit('pages');
       setEditingHabit(null);
       setIsAdding(false);
+      if (createHabit === 'true') router.setParams({ createHabit: undefined });
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Impossible d'ajouter ce petit pas.");
     } finally {
@@ -167,7 +182,7 @@ export default function TasksScreen() {
         <View style={styles.sectionHeading}>
           <View>
             <Text style={styles.sectionTitle}>Mes petits pas</Text>
-            <Text style={styles.sectionHint}>Une chose après l’autre.</Text>
+            <Text style={styles.sectionHint}>Maintiens le nom d’une tâche ou routine pour afficher « Supprimer ».</Text>
           </View>
           <Text style={styles.sectionCount}>{pendingTasks.length} à faire</Text>
           <Pressable
@@ -199,9 +214,16 @@ export default function TasksScreen() {
                   {task.completed ? <Text style={styles.checkmark}>✓</Text> : null}
                 </Pressable>
                 <View style={styles.todoCopy}>
-                  <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]}>
-                    {task.title}
-                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={task.title}
+                    accessibilityHint="Maintiens le nom appuyé pour afficher le bouton de suppression."
+                    delayLongPress={400}
+                    onLongPress={() => setDeleteActionTaskId(task.id)}>
+                    <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]}>
+                      {task.title}
+                    </Text>
+                  </Pressable>
                   {task.description ? (
                     <Text style={styles.taskMeta}>{task.description}</Text>
                   ) : null}
@@ -232,13 +254,15 @@ export default function TasksScreen() {
                     hitSlop={8}>
                     <Text style={styles.todoAction}>✎</Text>
                   </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Supprimer ${task.title}`}
-                    onPress={() => confirmDeleteTask(task)}
-                    hitSlop={8}>
-                    <Text style={styles.todoDelete}>×</Text>
-                  </Pressable>
+                  {deleteActionTaskId === task.id ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Supprimer ${task.title}`}
+                      onPress={() => confirmDeleteTask(task)}
+                      style={styles.deleteTaskAction}>
+                      <Text style={styles.deleteTaskActionText}>Supprimer</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
             ))}
@@ -310,9 +334,16 @@ export default function TasksScreen() {
                   </View>
                 )}
                 <View style={styles.taskCopy}>
-                  <Text style={[styles.taskTitle, habit.isCompleted && styles.taskTitleDone]}>
-                    {habit.title}
-                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={habit.title}
+                    accessibilityHint="Maintiens appuyé pour afficher le bouton de suppression."
+                    delayLongPress={400}
+                    onLongPress={() => setDeleteActionHabitId(habit.id)}>
+                    <Text style={[styles.taskTitle, habit.isCompleted && styles.taskTitleDone]}>
+                      {habit.title}
+                    </Text>
+                  </Pressable>
                   {habit.goalType === 'check' ? (
                     <Text style={styles.taskMeta}>
                       {habit.isCompleted ? 'C’est fait, bravo.' : 'Un petit pas, à ton rythme'}
@@ -343,6 +374,18 @@ export default function TasksScreen() {
                   style={styles.habitEditButton}>
                   <Text style={styles.todoAction}>✎</Text>
                 </Pressable>
+                {deleteActionHabitId === habit.id ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Supprimer la routine ${habit.title}`}
+                    onPress={() => {
+                      setHabitToDelete(habit);
+                      setDeleteActionHabitId(null);
+                    }}
+                    style={styles.deleteTaskAction}>
+                    <Text style={styles.deleteTaskActionText}>Supprimer</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </View>
@@ -369,7 +412,14 @@ export default function TasksScreen() {
                 <View key={habit.id} style={styles.taskRow}>
                   <Text style={styles.routineIcon}>{habit.icon}</Text>
                   <View style={styles.taskCopy}>
-                    <Text style={styles.taskTitle}>{habit.title}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={habit.title}
+                      accessibilityHint="Maintiens appuyé pour afficher le bouton de suppression."
+                      delayLongPress={400}
+                      onLongPress={() => setDeleteActionHabitId(habit.id)}>
+                      <Text style={styles.taskTitle}>{habit.title}</Text>
+                    </Pressable>
                     <Text style={styles.taskMeta}>
                       {habit.frequencyDays
                         .map((day) => ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][day])
@@ -395,6 +445,18 @@ export default function TasksScreen() {
                     style={styles.habitEditButton}>
                     <Text style={styles.todoAction}>✎</Text>
                   </Pressable>
+                  {deleteActionHabitId === habit.id ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Supprimer la routine ${habit.title}`}
+                      onPress={() => {
+                        setHabitToDelete(habit);
+                        setDeleteActionHabitId(null);
+                      }}
+                      style={styles.deleteTaskAction}>
+                      <Text style={styles.deleteTaskActionText}>Supprimer</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -425,9 +487,9 @@ export default function TasksScreen() {
 
       <BottomNavigation active="tasks" />
 
-      <Modal visible={isAdding} transparent animationType="none" onRequestClose={dismissHabitSheet}>
+      <Modal visible={habitModalVisible} transparent animationType="none" onRequestClose={dismissHabitSheet}>
         <View style={styles.modalBackdrop}>
-          <SwipeDismissSheet visible={isAdding} onDismiss={dismissHabitSheet} style={styles.modal}>
+          <SwipeDismissSheet visible={habitModalVisible} onDismiss={dismissHabitSheet} style={styles.modal}>
             <Text style={styles.modalEyebrow}>À TON RYTHME</Text>
             <Text style={styles.modalTitle}>{editingHabit ? 'Modifier mon habitude' : 'Un petit pas'}</Text>
             <TextInput
@@ -461,13 +523,57 @@ export default function TasksScreen() {
               ) || (habitGoalType === 'count' && !habitGoalUnit.trim())}
               style={styles.modalAction}
             />
-            <Pressable onPress={() => setIsAdding(false)} style={styles.cancel}>
+            <Pressable onPress={dismissHabitSheet} style={styles.cancel}>
               <Text style={styles.cancelText}>Pas maintenant</Text>
             </Pressable>
           </SwipeDismissSheet>
         </View>
       </Modal>
 
+      <Modal
+        visible={Boolean(taskToDelete)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deletingTask) setTaskToDelete(null);
+        }}>
+        <View style={styles.deleteBackdrop}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.modalEyebrow}>CONFIRMATION</Text>
+            <Text style={styles.deleteModalTitle}>Supprimer cette tâche ?</Text>
+            <Text style={styles.deleteModalMessage}>{taskToDelete?.title}</Text>
+            {deleteError ? <Text accessibilityRole="alert" style={styles.error}>{deleteError}</Text> : null}
+            <View style={styles.deleteModalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={deletingTask}
+                onPress={() => setTaskToDelete(null)}
+                style={styles.keepTaskButton}>
+                <Text style={styles.keepTaskText}>Garder</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={deletingTask}
+                onPress={() => void handleDeleteTask()}
+                style={styles.confirmTaskDeleteButton}>
+                {deletingTask
+                  ? <ActivityIndicator color={colors.surface} />
+                  : <Text style={styles.confirmTaskDeleteText}>Supprimer</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <DeleteConfirmationModal
+        visible={Boolean(habitToDelete)}
+        itemName={habitToDelete?.title ?? ''}
+        onCancel={() => setHabitToDelete(null)}
+        onConfirm={async () => {
+          if (!habitToDelete) return;
+          await deleteHabit(habitToDelete.id);
+          setHabitToDelete(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -516,6 +622,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   priorityImportant: { color: palette.clay, backgroundColor: palette.peachLight },
   dueDate: { color: palette.textSecondary, fontSize: 8 },
   todoActions: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  deleteTaskAction: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: borderRadius.extraLarge, backgroundColor: palette.peachLight },
+  deleteTaskActionText: { color: palette.clay, fontSize: 8, fontWeight: '700' },
   habitEditButton: { alignSelf: 'center', paddingLeft: spacing.xs },
   habitCalendarButton: { alignSelf: 'center', paddingLeft: spacing.xs },
   habitCalendarText: { color: palette.sage, fontSize: 15 },
@@ -562,4 +670,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   modalAction: { backgroundColor: palette.sage, borderWidth: 0, marginTop: spacing.md },
   cancel: { alignItems: 'center', padding: spacing.md },
   cancelText: { color: palette.textSecondary, fontSize: 12, fontWeight: '600' },
+  deleteBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(42,48,39,0.42)' },
+  deleteModal: { width: '100%', maxWidth: 380, padding: spacing.lg, borderRadius: borderRadius.large, backgroundColor: palette.background },
+  deleteModalTitle: { color: palette.textPrimary, fontSize: 18, fontFamily: typography.fonts.display, fontWeight: '600', textAlign: 'center', marginTop: spacing.xs },
+  deleteModalMessage: { color: palette.textSecondary, fontSize: 11, textAlign: 'center', marginTop: spacing.sm },
+  deleteModalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  keepTaskButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
+  keepTaskText: { color: palette.sage, fontSize: 10, fontWeight: '700' },
+  confirmTaskDeleteButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.clay },
+  confirmTaskDeleteText: { color: palette.surface, fontSize: 10, fontWeight: '700' },
 });

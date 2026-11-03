@@ -2,7 +2,6 @@ import { typography } from '@/theme/typography';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,12 +49,12 @@ function cleanTime(value: string) {
   return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
 }
 
-function TaskEditorForm({ task }: { task?: TodoTask }) {
+function TaskEditorForm({ task, initialDate }: { task?: TodoTask; initialDate?: string }) {
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
   const { saveTask, deleteTask } = useTasks();
   const [title, setTitle] = useState(task?.title ?? '');
-  const [date, setDate] = useState(task?.dueDate ?? getDateKey(new Date()));
+  const [date, setDate] = useState(task?.dueDate ?? (initialDate && isValidDate(initialDate) ? initialDate : getDateKey(new Date())));
   const [startTime, setStartTime] = useState(task?.startTime ?? '09:00');
   const [endTime, setEndTime] = useState(getEndTime(task));
   const [category, setCategory] = useState(task?.category ?? 'Études');
@@ -66,6 +65,8 @@ function TaskEditorForm({ task }: { task?: TodoTask }) {
   );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const durationMinutes = (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -115,20 +116,19 @@ function TaskEditorForm({ task }: { task?: TodoTask }) {
     }
   };
 
-  const confirmDelete = () => {
+  const handleDelete = async () => {
     if (!task) return;
-    Alert.alert('Supprimer ce petit pas ?', task.title, [
-      { text: 'Garder', style: 'cancel' },
-      {
-        text: 'Supprimer',
-        style: 'destructive',
-        onPress: () => {
-          void deleteTask(task.id).then(() => router.back()).catch((reason: unknown) => {
-            setError(reason instanceof Error ? reason.message : 'Impossible de supprimer ce petit pas.');
-          });
-        },
-      },
-    ]);
+    setDeleting(true);
+    setError('');
+    try {
+      await deleteTask(task.id);
+      router.back();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Impossible de supprimer ce petit pas.');
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
   };
 
   return (
@@ -287,9 +287,37 @@ function TaskEditorForm({ task }: { task?: TodoTask }) {
           <Text style={styles.cancelText}>Annuler les modifications</Text>
         </Pressable>
         {task ? (
-          <Pressable accessibilityRole="button" disabled={saving} onPress={confirmDelete} style={styles.deleteButton}>
-            <Text style={styles.deleteText}>Supprimer ce petit pas</Text>
-          </Pressable>
+          confirmingDelete ? (
+            <View style={styles.deleteConfirmation}>
+              <Text style={styles.deleteConfirmationText}>Supprimer définitivement « {task.title} » ?</Text>
+              <View style={styles.deleteActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleting}
+                  onPress={() => setConfirmingDelete(false)}
+                  style={styles.keepButton}>
+                  <Text style={styles.cancelText}>Garder</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleting}
+                  onPress={() => void handleDelete()}
+                  style={styles.confirmDeleteButton}>
+                  {deleting
+                    ? <ActivityIndicator color={colors.surface} />
+                    : <Text style={styles.confirmDeleteText}>Supprimer</Text>}
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={saving || deleting}
+              onPress={() => setConfirmingDelete(true)}
+              style={styles.deleteButton}>
+              <Text style={styles.deleteText}>Supprimer ce petit pas</Text>
+            </Pressable>
+          )
         ) : null}
       </ScrollView>
       <BottomNavigation active="tasks" />
@@ -298,7 +326,7 @@ function TaskEditorForm({ task }: { task?: TodoTask }) {
 }
 
 export default function TaskEditorScreen() {
-  const { taskId } = useLocalSearchParams<{ taskId?: string }>();
+  const { taskId, date } = useLocalSearchParams<{ taskId?: string; date?: string }>();
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
   const { tasks, loading, error } = useTasks();
@@ -332,7 +360,7 @@ export default function TaskEditorScreen() {
       </SafeAreaView>
     );
   }
-  return <TaskEditorForm key={task?.id ?? 'new-task'} task={task} />;
+  return <TaskEditorForm key={task?.id ?? `new-task-${date ?? ''}`} task={task} initialDate={date} />;
 }
 
 const createStyles = (palette: AppColors) => StyleSheet.create({
@@ -375,6 +403,12 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   cancelText: { color: palette.sage, fontSize: 8, fontWeight: '700' },
   deleteButton: { minHeight: 30, alignItems: 'center', justifyContent: 'center' },
   deleteText: { color: palette.clay, fontSize: 8 },
+  deleteConfirmation: { padding: spacing.sm, marginTop: spacing.xs, borderWidth: 1, borderColor: palette.peach, borderRadius: borderRadius.medium, backgroundColor: palette.peachLight },
+  deleteConfirmationText: { color: palette.textPrimary, fontSize: 8, lineHeight: 12, textAlign: 'center' },
+  deleteActions: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
+  keepButton: { flex: 1, minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.surface },
+  confirmDeleteButton: { flex: 1, minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.extraLarge, backgroundColor: palette.clay },
+  confirmDeleteText: { color: palette.surface, fontSize: 8, fontWeight: '700' },
   error: { color: palette.error, fontSize: 8, lineHeight: 12, marginTop: spacing.xs },
   loading: { marginVertical: spacing.xl },
 });

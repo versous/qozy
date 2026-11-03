@@ -96,7 +96,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'name', 'duration', 'intensity', 'equipment', 'note',
           'selectedDate', 'completedDate', 'completedDates',
-          'routineDays', 'routineEnabled', 'userId', 'createdAt'
+          'routineDays', 'routineEnabled', 'mode', 'targetReps',
+          'category', 'illustration', 'counterMode', 'reminderEnabled',
+          'reminderTime', 'userId', 'createdAt'
         ])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
@@ -111,7 +113,26 @@ service cloud.firestore {
             && request.resource.data.routineDays.size() <= 7
             && request.resource.data.routineDays.hasOnly([0, 1, 2, 3, 4, 5, 6])))
         && (!request.resource.data.keys().hasAny(['routineEnabled'])
-          || request.resource.data.routineEnabled is bool);
+          || request.resource.data.routineEnabled is bool)
+        && (!request.resource.data.keys().hasAny(['mode'])
+          || request.resource.data.mode in ['timer', 'repetitions'])
+        && (!request.resource.data.keys().hasAny(['targetReps'])
+          || request.resource.data.targetReps == null
+          || (request.resource.data.targetReps is int
+            && request.resource.data.targetReps >= 1
+            && request.resource.data.targetReps <= 1000))
+        && (!request.resource.data.keys().hasAny(['category'])
+          || (request.resource.data.category is string
+            && request.resource.data.category.size() <= 60))
+        && (!request.resource.data.keys().hasAny(['illustration'])
+          || request.resource.data.illustration in ['movement', 'yoga', 'room'])
+        && (!request.resource.data.keys().hasAny(['counterMode'])
+          || request.resource.data.counterMode in ['manual', 'camera'])
+        && (!request.resource.data.keys().hasAny(['reminderEnabled'])
+          || request.resource.data.reminderEnabled is bool)
+        && (!request.resource.data.keys().hasAny(['reminderTime'])
+          || (request.resource.data.reminderTime is string
+            && request.resource.data.reminderTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')));
 
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
@@ -120,7 +141,9 @@ service cloud.firestore {
           .hasOnly([
             'name', 'duration', 'intensity', 'equipment', 'note',
             'selectedDate', 'completedDate', 'completedDates',
-            'routineDays', 'routineEnabled'
+            'routineDays', 'routineEnabled', 'mode', 'targetReps',
+            'category', 'illustration', 'counterMode', 'reminderEnabled',
+            'reminderTime'
           ])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
@@ -142,7 +165,26 @@ service cloud.firestore {
             && request.resource.data.routineDays.size() <= 7
             && request.resource.data.routineDays.hasOnly([0, 1, 2, 3, 4, 5, 6])))
         && (!request.resource.data.keys().hasAny(['routineEnabled'])
-          || request.resource.data.routineEnabled is bool);
+          || request.resource.data.routineEnabled is bool)
+        && (!request.resource.data.keys().hasAny(['mode'])
+          || request.resource.data.mode in ['timer', 'repetitions'])
+        && (!request.resource.data.keys().hasAny(['targetReps'])
+          || request.resource.data.targetReps == null
+          || (request.resource.data.targetReps is int
+            && request.resource.data.targetReps >= 1
+            && request.resource.data.targetReps <= 1000))
+        && (!request.resource.data.keys().hasAny(['category'])
+          || (request.resource.data.category is string
+            && request.resource.data.category.size() <= 60))
+        && (!request.resource.data.keys().hasAny(['illustration'])
+          || request.resource.data.illustration in ['movement', 'yoga', 'room'])
+        && (!request.resource.data.keys().hasAny(['counterMode'])
+          || request.resource.data.counterMode in ['manual', 'camera'])
+        && (!request.resource.data.keys().hasAny(['reminderEnabled'])
+          || request.resource.data.reminderEnabled is bool)
+        && (!request.resource.data.keys().hasAny(['reminderTime'])
+          || (request.resource.data.reminderTime is string
+            && request.resource.data.reminderTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')));
     }
 
     match /tasks/{taskId} {
@@ -281,7 +323,8 @@ service cloud.firestore {
         && request.resource.data.taskTarget <= 1000
         && request.resource.data.updatedAt is timestamp;
 
-      allow delete: if false;
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
     }
 
     match /timeEntries/{entryId} {
@@ -311,7 +354,10 @@ service cloud.firestore {
         && request.resource.data.durationSeconds > 0
         && request.resource.data.durationSeconds <= 31536000;
 
-      allow update, delete: if false;
+      allow update: if false;
+
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
 
     match /{path=**}/completions/{date} {

@@ -20,6 +20,8 @@ import {
 } from '@/services/offlineStore';
 
 export type ExerciseMode = 'timer' | 'repetitions';
+export type ExerciseCounterMode = 'manual' | 'camera';
+export type ExerciseIllustration = 'movement' | 'yoga' | 'room';
 
 export interface Exercise {
   id: string;
@@ -30,6 +32,11 @@ export interface Exercise {
   intensity: string;
   equipment: string;
   note: string;
+  category?: string;
+  illustration?: ExerciseIllustration;
+  counterMode?: ExerciseCounterMode;
+  reminderEnabled?: boolean;
+  reminderTime?: string;
   selectedDate: string | null;
   completedDate: string | null;
   completedDates?: string[];
@@ -159,6 +166,7 @@ export function useExercises() {
       data: { ...exercise, name, userId, createdAt: Timestamp.now() },
     }, userId);
     setExercises((current) => applyPendingWrites(current, [write]));
+    return id;
   };
 
   const toggleToday = async (
@@ -247,9 +255,16 @@ export function useExercises() {
     addToToday: boolean,
     routineDays: HabitDay[] = ALL_HABIT_DAYS,
     mode: ExerciseMode = 'timer',
-    targetReps?: number
+    targetReps?: number,
+    options: {
+      category?: string;
+      illustration?: ExerciseIllustration;
+      counterMode?: ExerciseCounterMode;
+      reminderEnabled?: boolean;
+      reminderTime?: string;
+    } = {}
   ) => {
-    await saveExercise({
+    return saveExercise({
       name,
       duration,
       mode,
@@ -257,6 +272,11 @@ export function useExercises() {
       intensity,
       equipment,
       note: note.trim(),
+      category: options.category ?? 'Exercice · Mouvement',
+      illustration: options.illustration ?? 'movement',
+      counterMode: options.counterMode ?? 'manual',
+      reminderEnabled: options.reminderEnabled ?? false,
+      reminderTime: options.reminderTime ?? '18:00',
       selectedDate: addToToday ? today : null,
       completedDate: null,
       completedDates: [],
@@ -275,7 +295,14 @@ export function useExercises() {
     routineDays: HabitDay[],
     routineEnabled: boolean,
     mode: ExerciseMode = 'timer',
-    targetReps?: number
+    targetReps?: number,
+    options: {
+      category?: string;
+      illustration?: ExerciseIllustration;
+      counterMode?: ExerciseCounterMode;
+      reminderEnabled?: boolean;
+      reminderTime?: string;
+    } = {}
   ) => {
     if (!db || !userId) throw new Error('Connectez-vous pour modifier un exercice.');
     const exercise = exercises.find((item) => item.id === exerciseId);
@@ -305,6 +332,11 @@ export function useExercises() {
       intensity,
       equipment: trimmedEquipment,
       note: trimmedNote,
+      category: options.category ?? exercise.category ?? 'Exercice · Mouvement',
+      illustration: options.illustration ?? exercise.illustration ?? 'movement',
+      counterMode: options.counterMode ?? exercise.counterMode ?? 'manual',
+      reminderEnabled: options.reminderEnabled ?? exercise.reminderEnabled ?? false,
+      reminderTime: options.reminderTime ?? exercise.reminderTime ?? '18:00',
       routineDays: routineEnabled ? [...new Set(routineDays)] : [],
       routineEnabled,
       selectedDate: routineEnabled ? exercise.selectedDate : null,
@@ -319,6 +351,33 @@ export function useExercises() {
     setExercises((current) => applyPendingWrites(current, [write]));
   };
 
+  const deleteExercise = async (exerciseId: string) => {
+    if (!db || !userId) throw new Error('Connectez-vous pour supprimer un exercice.');
+    const exercise = exercises.find((item) => item.id === exerciseId);
+    if (!exercise || exercise.userId !== userId) {
+      throw new Error('Cet exercice est introuvable sur cet appareil.');
+    }
+    const write = await queueOfflineWrite({
+      collectionKey: 'exercises',
+      documentId: exerciseId,
+      path: `exercises/${exerciseId}`,
+      kind: 'delete',
+    }, userId);
+    setExercises((current) => applyPendingWrites(current, [write]));
+  };
+
+  const setExerciseReminder = async (exerciseId: string, enabled: boolean, time: string) => {
+    if (!db || !userId) throw new Error('Connectez-vous pour modifier le rappel.');
+    const write = await queueOfflineWrite({
+      collectionKey: 'exercises',
+      documentId: exerciseId,
+      path: `exercises/${exerciseId}`,
+      kind: 'update',
+      data: { reminderEnabled: enabled, reminderTime: time },
+    }, userId);
+    setExercises((current) => applyPendingWrites(current, [write]));
+  };
+
   return {
     exercises: userId && loadedUserId === userId ? exercises : [],
     today,
@@ -328,5 +387,7 @@ export function useExercises() {
     toggleCompleted,
     addCustomExercise,
     updateCustomExercise,
+    deleteExercise,
+    setExerciseReminder,
   };
 }

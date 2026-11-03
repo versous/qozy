@@ -1,8 +1,9 @@
-import React, { useState, useSyncExternalStore } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
-import { signOut } from 'firebase/auth';
+import { deleteUser, EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signOut, type User } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { BrandHeader } from '@/components/BrandHeader';
@@ -14,18 +15,27 @@ import { usePremium } from '@/services/PremiumProvider';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { typography } from '@/theme/typography';
+import { deleteAccountData } from '@/services/accountDeletion';
 
 const defaultSyncStatus: OfflineSyncStatus = { isOnline: null, pendingWrites: 0, error: null };
 
 export default function ProfileScreen() {
-  const { colors, mode, toggleMode } = useAppTheme();
-  const { isPremium, isPreview } = usePremium();
-  const isDark = mode === 'dark';
+  const { colors } = useAppTheme();
+  const { isPremium } = usePremium();
   const styles = createStyles(colors);
   const { habits, loading, error } = useHabits();
-  const [signOutError, setSignOutError] = useState('');
+  const [user, setUser] = useState<User | null>(auth?.currentUser ?? null);
+  const [accountError, setAccountError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const user = auth?.currentUser;
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, setUser);
+  }, []);
   const syncStatus = useSyncExternalStore(
     (onStoreChange) => user
       ? subscribeOfflineStore((changedUserId) => {
@@ -49,16 +59,58 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     if (!auth) return;
-    setSignOutError('');
+    setAccountError('');
     setIsSigningOut(true);
     try {
       await signOut(auth);
-      router.replace('/(auth)/login');
     } catch {
-      setSignOutError('La déconnexion n’a pas abouti. Réessaie.');
+      setAccountError('La déconnexion n’a pas abouti. Réessaie.');
     } finally {
       setIsSigningOut(false);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!auth || !user?.email) {
+      setAccountError('La suppression de ce type de compte nécessite une reconnexion.');
+      return;
+    }
+    if (deleteConfirmation !== 'SUPPRIMER') {
+      setAccountError('Saisis SUPPRIMER pour confirmer la suppression définitive.');
+      return;
+    }
+    if (!deletePassword) {
+      setAccountError('Saisis ton mot de passe pour confirmer ton identité.');
+      return;
+    }
+    setAccountError('');
+    setIsDeletingAccount(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, deletePassword);
+      await reauthenticateWithCredential(user, credential);
+      await deleteAccountData(user);
+      await deleteUser(user);
+      setDeleteModalVisible(false);
+      setDeletePassword('');
+      setDeleteConfirmation('');
+      router.replace('/');
+    } catch (reason) {
+      if (reason instanceof FirebaseError && reason.code === 'auth/wrong-password') {
+        setAccountError('Mot de passe incorrect.');
+      } else if (reason instanceof FirebaseError && reason.code === 'auth/requires-recent-login') {
+        setAccountError('Reconnecte-toi puis réessaie de supprimer ton compte.');
+      } else {
+        setAccountError(reason instanceof Error
+          ? `La suppression n’a pas abouti : ${reason.message}`
+          : 'La suppression du compte a échoué. Réessaie.');
+      }
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const openSubscriptionManagement = async () => {
+    router.push('/premium');
   };
 
   return (
@@ -81,11 +133,27 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View style={styles.profileCopy}>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.email}>{email}</Text>
-            <Text style={styles.accountNote}>Compte connecté · Tes données personnelles</Text>
+            <Text style={styles.name}>{user ? name : 'Retrouver mon Nid'}</Text>
+            <Text style={styles.email}>{user ? email : 'Tes petits pas, à ton rythme.'}</Text>
+            <Text style={styles.accountNote}>
+              {user ? 'Compte connecté · Tes données personnelles' : 'Tu peux utiliser l’application sans compte.'}
+            </Text>
           </View>
         </View>
+        {!user ? (
+          <View style={styles.guestAccountCard}>
+            <Text style={styles.guestTitle}>Retrouver ton Nid</Text>
+            <Text style={styles.guestDescription}>Connecte-toi ou crée un compte pour synchroniser tes données et retrouver tes habitudes sur tes appareils.</Text>
+            <CosyButton title="Se connecter" onPress={() => router.push('/(auth)/login')} style={styles.accountButton} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/(auth)/login?mode=register')}
+              style={styles.createAccountButton}>
+              <Text style={styles.createAccountText}>Nouveau ici ? Créer un compte</Text>
+            </Pressable>
+            <Text style={styles.offlineNote}>Tu peux découvrir l’application sans compte. La synchronisation de tes données nécessite un compte.</Text>
+          </View>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {syncMessage ? (
@@ -163,18 +231,15 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Mon Nid</Text>
         </View>
         <Pressable
-          accessibilityRole="switch"
-          accessibilityState={{ checked: isDark }}
-          onPress={toggleMode}
+          accessibilityRole="button"
+          onPress={() => router.push('/settings' as Href)}
           style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
           <View style={[styles.menuIcon, styles.menuIconSage]}><Text style={styles.menuIconText}>⚙</Text></View>
           <View style={styles.menuCopy}>
             <Text style={styles.menuTitle}>Paramètres et accessibilité</Text>
             <Text style={styles.menuSubtitle}>Thème, lecture et données</Text>
           </View>
-          <View style={[styles.themeSwitch, isDark && styles.themeSwitchActive]}>
-            <Text style={[styles.themeSwitchText, isDark && styles.themeSwitchTextActive]}>{isDark ? 'Sombre' : 'Clair'}</Text>
-          </View>
+          <Text style={styles.menuArrow}>›</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -188,28 +253,86 @@ export default function ProfileScreen() {
           <Text style={styles.menuArrow}>›</Text>
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/premium')}
-          style={({ pressed }) => [styles.premiumButton, pressed && styles.pressed]}>
-          <Text style={styles.premiumButtonIcon}>✳</Text>
-          <Text style={styles.premiumButtonText}>
-            {isPremium ? 'Mon espace Premium' : 'Découvrir Premium'}
-          </Text>
-          {isPreview ? <Text style={styles.previewLabel}>APERÇU</Text> : null}
-        </Pressable>
-
-        {signOutError ? <Text style={styles.error}>{signOutError}</Text> : null}
+        {accountError ? <Text style={styles.error}>{accountError}</Text> : null}
         <CosyButton
-          title={isSigningOut ? 'Déconnexion…' : 'Se déconnecter'}
+          title={isPremium ? 'Gérer mon abonnement' : 'Changer d’abonnement'}
           variant="outline"
-          onPress={() => void handleSignOut()}
-          disabled={isSigningOut || !auth}
-          style={styles.signOutButton}
+          onPress={() => void openSubscriptionManagement()}
+          style={styles.accountActionButton}
         />
+        {user ? (
+          <>
+            <CosyButton
+              title={isSigningOut ? 'Déconnexion…' : 'Se déconnecter'}
+              variant="outline"
+              onPress={() => void handleSignOut()}
+              disabled={isSigningOut || !auth}
+              style={styles.signOutButton}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setAccountError('');
+                setDeleteModalVisible(true);
+              }}
+              style={styles.deleteAccountButton}>
+              <Text style={styles.deleteAccountText}>Supprimer mon compte</Text>
+            </Pressable>
+          </>
+        ) : null}
         <Text style={styles.footer}>Prends le temps qu’il te faut. 🌿</Text>
       </ScrollView>
       <BottomNavigation active="account" />
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeletingAccount) setDeleteModalVisible(false);
+        }}>
+        <View style={styles.deleteBackdrop}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteTitle}>Supprimer définitivement ton compte ?</Text>
+            <Text style={styles.deleteDescription}>
+              Tes données synchronisées seront supprimées. Les abonnements App Store ou Google Play doivent être résiliés séparément avant la suppression.
+            </Text>
+            <Pressable onPress={() => void openSubscriptionManagement()} style={styles.subscriptionLink}>
+              <Text style={styles.subscriptionLinkText}>Voir les options d’abonnement →</Text>
+            </Pressable>
+            <Text style={styles.deleteLabel}>Mot de passe</Text>
+            <TextInput
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              secureTextEntry
+              editable={!isDeletingAccount}
+              placeholder="Confirme ton identité"
+              placeholderTextColor={colors.textLight}
+              style={styles.deleteInput}
+            />
+            <Text style={styles.deleteLabel}>Écris SUPPRIMER pour confirmer</Text>
+            <TextInput
+              value={deleteConfirmation}
+              onChangeText={setDeleteConfirmation}
+              autoCapitalize="characters"
+              editable={!isDeletingAccount}
+              style={styles.deleteInput}
+            />
+            {accountError ? <Text style={styles.error}>{accountError}</Text> : null}
+            <CosyButton
+              title={isDeletingAccount ? 'Suppression…' : 'Supprimer mon compte'}
+              onPress={() => void handleDeleteAccount()}
+              disabled={isDeletingAccount}
+              style={styles.confirmDeleteButton}
+            />
+            <Pressable
+              disabled={isDeletingAccount}
+              onPress={() => setDeleteModalVisible(false)}
+              style={styles.cancelDeleteButton}>
+              <Text style={styles.cancelDeleteText}>Annuler</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -226,6 +349,13 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.peach },
   avatarText: { color: palette.clay, fontSize: 16, fontWeight: '700' },
   profileCopy: { flex: 1 },
+  guestAccountCard: { padding: spacing.md, marginTop: spacing.sm, borderRadius: borderRadius.medium, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  guestTitle: { color: palette.textPrimary, fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '600' },
+  guestDescription: { color: palette.textSecondary, fontSize: 10, lineHeight: 15, marginTop: spacing.xs },
+  accountButton: { backgroundColor: palette.sage, borderRadius: borderRadius.extraLarge, marginTop: spacing.sm },
+  createAccountButton: { alignItems: 'center', paddingVertical: spacing.sm },
+  createAccountText: { color: palette.sage, fontSize: 9, fontWeight: '700' },
+  offlineNote: { color: palette.textSecondary, fontSize: 8, lineHeight: 12, padding: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.sagePale },
   name: { color: palette.textPrimary, fontSize: 13, fontWeight: '700' },
   email: { color: palette.textSecondary, fontSize: 9, marginTop: 2 },
   accountNote: { color: palette.sage, fontSize: 8, marginTop: 4 },
@@ -251,15 +381,21 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   menuTitle: { color: palette.textPrimary, fontSize: 10, fontWeight: '600' },
   menuSubtitle: { color: palette.textSecondary, fontSize: 8, marginTop: 2 },
   menuArrow: { color: palette.sage, fontSize: 22 },
-  themeSwitch: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
-  themeSwitchActive: { backgroundColor: palette.sage },
-  themeSwitchText: { color: palette.sage, fontSize: 8, fontWeight: '700' },
-  themeSwitchTextActive: { color: palette.surface },
-  premiumButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, borderRadius: borderRadius.extraLarge, backgroundColor: palette.sagePale },
-  premiumButtonIcon: { color: palette.sage, fontSize: 14 },
-  premiumButtonText: { color: palette.sage, fontSize: 10, fontWeight: '700' },
-  previewLabel: { color: palette.textSecondary, fontSize: 7, fontWeight: '700' },
   signOutButton: { marginTop: spacing.md, borderColor: palette.border, backgroundColor: palette.surface },
+  accountActionButton: { marginTop: spacing.sm, borderColor: palette.border, backgroundColor: palette.surface },
+  deleteAccountButton: { alignItems: 'center', padding: spacing.sm, marginTop: spacing.xs },
+  deleteAccountText: { color: palette.error, fontSize: 9, fontWeight: '700' },
+  deleteBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(0,0,0,0.42)' },
+  deleteModal: { padding: spacing.md, borderRadius: borderRadius.medium, backgroundColor: palette.surface },
+  deleteTitle: { color: palette.textPrimary, fontSize: 17, fontFamily: typography.fonts.display, fontWeight: '600' },
+  deleteDescription: { color: palette.textSecondary, fontSize: 10, lineHeight: 15, marginTop: spacing.xs },
+  subscriptionLink: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
+  subscriptionLinkText: { color: palette.sage, fontSize: 9, fontWeight: '700' },
+  deleteLabel: { color: palette.textPrimary, fontSize: 9, fontWeight: '700', marginTop: spacing.sm, marginBottom: spacing.xs },
+  deleteInput: { minHeight: 42, borderRadius: borderRadius.small, paddingHorizontal: spacing.sm, backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border, color: palette.textPrimary, fontSize: 11 },
+  confirmDeleteButton: { backgroundColor: palette.error, borderWidth: 0, borderRadius: borderRadius.extraLarge, marginTop: spacing.md },
+  cancelDeleteButton: { alignItems: 'center', padding: spacing.sm },
+  cancelDeleteText: { color: palette.sage, fontSize: 10, fontWeight: '700' },
   footer: { color: palette.textSecondary, fontSize: 10, fontFamily: typography.fonts.display, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.sm },
   pressed: { opacity: 0.78 },
 });

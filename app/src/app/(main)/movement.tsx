@@ -7,6 +7,7 @@ import { router, type Href } from 'expo-router';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { BrandHeader } from '@/components/BrandHeader';
 import { CosyButton } from '@/components/common/CosyButton';
+import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { Exercise, isExerciseScheduledOnDate, useExercises } from '@/hooks/useExercises';
 import { borderRadius, spacing, type AppColors } from '@/theme/colors';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -14,7 +15,9 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 export default function MovementScreen() {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const { exercises, today, loading, error, toggleCompleted } = useExercises();
+  const { exercises, today, loading, error, toggleCompleted, deleteExercise } = useExercises();
+  const [deleteActionExerciseId, setDeleteActionExerciseId] = React.useState<string | null>(null);
+  const [exerciseToDelete, setExerciseToDelete] = React.useState<Exercise | null>(null);
   const todaysExercises = exercises.filter((exercise) => isExerciseScheduledOnDate(exercise, today));
   const completed = todaysExercises.filter((exercise) => (exercise.completedDates ?? []).includes(today)).length;
   const nextExercise = todaysExercises.find((exercise) => !(exercise.completedDates ?? []).includes(today));
@@ -90,6 +93,7 @@ export default function MovementScreen() {
           <Text style={styles.sectionTitle}>Ma routine du jour</Text>
           <Text style={styles.sectionCount}>{todaysExercises.length} exercice{todaysExercises.length > 1 ? 's' : ''}</Text>
         </View>
+        <Text style={styles.longPressHint}>Maintiens un exercice appuyé pour afficher « Supprimer ».</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {todaysExercises.map((exercise) => {
@@ -101,8 +105,11 @@ export default function MovementScreen() {
                 accessibilityLabel={exercise.mode === 'repetitions'
                   ? `Commencer ${exercise.name}`
                   : `${isDone ? 'Décocher' : 'Cocher'} ${exercise.name}`}
+                accessibilityHint="Maintiens appuyé pour afficher le bouton de suppression."
                 accessibilityState={exercise.mode === 'repetitions' ? undefined : { checked: isDone }}
                 onPress={() => void (exercise.mode === 'repetitions' ? startExercise(exercise) : handleToggle(exercise))}
+                onLongPress={() => setDeleteActionExerciseId(exercise.id)}
+                delayLongPress={400}
                 style={styles.exerciseAction}>
                 <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
                   {isDone
@@ -132,6 +139,18 @@ export default function MovementScreen() {
                   hitSlop={8}
                   style={styles.calendarButton}>
                   <Text style={styles.calendarIcon}>▦</Text>
+                </Pressable>
+              ) : null}
+              {deleteActionExerciseId === exercise.id ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Supprimer ${exercise.name} de ma routine`}
+                  onPress={() => {
+                    setExerciseToDelete(exercise);
+                    setDeleteActionExerciseId(null);
+                  }}
+                  style={styles.deleteExerciseButton}>
+                  <Text style={styles.deleteExerciseText}>Supprimer</Text>
                 </Pressable>
               ) : null}
               {!exercise.routineEnabled ? <Text style={styles.arrow}>›</Text> : null}
@@ -173,6 +192,16 @@ export default function MovementScreen() {
 
       </ScrollView>
       <BottomNavigation active="tasks" />
+      <DeleteConfirmationModal
+        visible={Boolean(exerciseToDelete)}
+        itemName={exerciseToDelete?.name ?? ''}
+        onCancel={() => setExerciseToDelete(null)}
+        onConfirm={async () => {
+          if (!exerciseToDelete) return;
+          await deleteExercise(exerciseToDelete.id);
+          setExerciseToDelete(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -205,6 +234,7 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   sectionTitle: { color: palette.textPrimary, fontSize: 15, fontFamily: typography.fonts.display, fontWeight: '600' },
   sectionCount: { color: palette.textSecondary, fontSize: 9 },
+  longPressHint: { color: palette.textSecondary, fontSize: 8, lineHeight: 12, marginBottom: spacing.xs },
   error: { color: palette.error, fontSize: 10, marginBottom: spacing.sm },
   exerciseCard: { minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, marginBottom: spacing.xs },
   exerciseAction: { flex: 1, minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -218,6 +248,8 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
   exerciseMeta: { color: palette.textSecondary, fontSize: 8, marginTop: 3 },
   arrow: { color: palette.sage, fontSize: 21 },
   calendarButton: { padding: spacing.xs },
+  deleteExerciseButton: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: borderRadius.extraLarge, backgroundColor: palette.peachLight },
+  deleteExerciseText: { color: palette.clay, fontSize: 8, fontWeight: '700' },
   calendarIcon: { color: palette.sage, fontSize: 15 },
   emptyCard: { padding: spacing.md, borderRadius: borderRadius.small, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
   emptyTitle: { color: palette.textPrimary, fontSize: 11, fontWeight: '600' },

@@ -22,13 +22,14 @@ import { router, useFocusEffect, type Href } from 'expo-router';
 import { CosyButton } from '@/components/common/CosyButton';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { BrandHeader } from '@/components/BrandHeader';
+import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { HabitGoalFields } from '@/components/habits/HabitGoalFields';
 import { HabitProgressControl } from '@/components/habits/HabitProgressControl';
 import { AmbientGlow } from '@/components/SessionDeviceStatus';
 import { useTasks } from '@/hooks/useTasks';
 import { SwipeDismissSheet } from '@/components/SwipeDismissSheet';
 import { WeekdaySelector } from '@/components/WeekdaySelector';
-import { ALL_HABIT_DAYS, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
+import { ALL_HABIT_DAYS, type Habit, type HabitDay, type HabitGoalType, useHabits } from '@/hooks/useHabits';
 import { useHydration } from '@/hooks/useHydration';
 import { auth, db } from '@/services/firebase';
 import {
@@ -258,6 +259,8 @@ export default function Dashboard() {
   const [newHabitGoalType, setNewHabitGoalType] = useState<HabitGoalType>('check');
   const [newHabitGoalTarget, setNewHabitGoalTarget] = useState('20');
   const [newHabitGoalUnit, setNewHabitGoalUnit] = useState('pages');
+  const [deleteActionHabitId, setDeleteActionHabitId] = useState<string | null>(null);
+  const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingWater, setIsUpdatingWater] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -1092,49 +1095,75 @@ export default function Dashboard() {
           </View>
         ) : habits.length ? (
           <View style={styles.habitList}>
-            {habits.slice(0, 3).map((habit) => habit.goalType === 'check' ? (
-              <Pressable
-                key={habit.id}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: habit.isCompleted }}
-                onPress={() => {
-                  void toggleHabit(habit.id).catch((reason) => {
-                    Alert.alert(
-                      'Modification impossible',
-                      reason instanceof Error ? reason.message : 'Réessaie plus tard.'
-                    );
-                  });
-                }}
-                style={styles.habitRow}>
-                <View style={[styles.habitCheck, habit.isCompleted && styles.habitCheckDone]}>
-                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
-                </View>
-                <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
-                  {habit.title}
-                </Text>
-                <Text style={styles.habitStreak}>
-                  {habit.isCompleted ? 'Bravo' : 'À ton rythme'}
-                </Text>
-              </Pressable>
-            ) : (
-              <View key={habit.id} style={[styles.habitRow, styles.quantifiedHabitRow]}>
-                <View style={[styles.habitCheck, habit.isCompleted && styles.habitCheckDone]}>
-                  {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
-                </View>
-                <View style={styles.quantifiedHabitCopy}>
-                  <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
-                    {habit.title}
-                  </Text>
-                  <HabitProgressControl
-                    habit={habit}
-                    onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
-                  />
-                </View>
+            {habits.slice(0, 3).map((habit) => (
+              <View key={habit.id}>
+                {habit.goalType === 'check' ? (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: habit.isCompleted }}
+                    accessibilityHint="Maintiens appuyé pour afficher le bouton de suppression."
+                    delayLongPress={400}
+                    onLongPress={() => setDeleteActionHabitId(habit.id)}
+                    onPress={() => {
+                      void toggleHabit(habit.id).catch((reason) => {
+                        Alert.alert(
+                          'Modification impossible',
+                          reason instanceof Error ? reason.message : 'Réessaie plus tard.'
+                        );
+                      });
+                    }}
+                    style={styles.habitRow}>
+                    <View style={[styles.habitCheck, habit.isCompleted && styles.habitCheckDone]}>
+                      {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                    </View>
+                    <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
+                      {habit.title}
+                    </Text>
+                    <Text style={styles.habitStreak}>
+                      {habit.isCompleted ? 'Bravo' : 'À ton rythme'}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityHint="Maintiens appuyé pour afficher le bouton de suppression."
+                    delayLongPress={400}
+                    onLongPress={() => setDeleteActionHabitId(habit.id)}
+                    style={[styles.habitRow, styles.quantifiedHabitRow]}>
+                    <View style={[styles.habitCheck, habit.isCompleted && styles.habitCheckDone]}>
+                      {habit.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+                    </View>
+                    <View style={styles.quantifiedHabitCopy}>
+                      <Text style={[styles.habitTitle, habit.isCompleted && styles.habitTitleDone]}>
+                        {habit.title}
+                      </Text>
+                      <HabitProgressControl
+                        habit={habit}
+                        onProgress={(progress, date) => updateHabitProgress(habit.id, progress, date)}
+                      />
+                    </View>
+                  </Pressable>
+                )}
+                {deleteActionHabitId === habit.id ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Supprimer la routine ${habit.title}`}
+                    onPress={() => {
+                      setHabitToDelete(habit);
+                      setDeleteActionHabitId(null);
+                    }}
+                    style={styles.homeDeleteHabit}>
+                    <Text style={styles.homeDeleteHabitText}>Supprimer</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </View>
         ) : (
-          <Pressable onPress={() => setIsModalVisible(true)} style={styles.emptyCard}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push({ pathname: '/tasks', params: { createHabit: 'true' } })}
+            style={styles.emptyCard}>
             <View style={styles.emptyIcon}>
               <Text style={styles.emptyIconText}>＋</Text>
             </View>
@@ -1173,6 +1202,16 @@ export default function Dashboard() {
       </ScrollView>
 
       <BottomNavigation active="today" />
+      <DeleteConfirmationModal
+        visible={Boolean(habitToDelete)}
+        itemName={habitToDelete?.title ?? ''}
+        onCancel={() => setHabitToDelete(null)}
+        onConfirm={async () => {
+          if (!habitToDelete) return;
+          await deleteHabit(habitToDelete.id);
+          setHabitToDelete(null);
+        }}
+      />
 
       <Modal
         visible={isModalVisible}
@@ -2078,6 +2117,15 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
   },
+  homeDeleteHabit: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    marginBottom: spacing.xs,
+    borderRadius: borderRadius.extraLarge,
+    backgroundColor: palette.peachLight,
+  },
+  homeDeleteHabitText: { color: palette.clay, fontSize: 8, fontWeight: '700' },
   quantifiedHabitRow: {
     alignItems: 'flex-start',
     paddingVertical: spacing.sm,

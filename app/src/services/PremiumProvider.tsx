@@ -224,7 +224,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
   const status = unavailableMessage ? 'unavailable' : sdkStatus;
   const message = unavailableMessage ?? sdkMessage;
   const hasActiveUser = Boolean(userId && sdkUserId === userId);
-  const canPreview = __DEV__;
+  const canPreview = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_PREMIUM_PREVIEW === 'true';
   const isPreview = canPreview && previewEnabled && !(status === 'ready' && hasActiveUser && isPremium);
 
   const value = useMemo(() => ({

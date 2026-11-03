@@ -22,12 +22,13 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 const AuthScreen = () => {
   const colors = useAppTheme().colors;
   const styles = createStyles(colors);
-  const [isRegistering, setIsRegistering] = React.useState(false);
+  const { mode: requestedMode } = useLocalSearchParams<{ mode?: string }>();
+  const [isRegistering, setIsRegistering] = React.useState(requestedMode === 'register');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -245,6 +246,13 @@ const AuthScreen = () => {
                   : 'Pas encore de compte ? S’inscrire'}
               </Text>
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.replace('/')}
+              style={styles.offlineButton}>
+              <Text style={styles.offlineButtonText}>Continuer hors ligne</Text>
+            </Pressable>
+            <Text style={styles.offlineHint}>Tu pourras te connecter plus tard depuis Mon compte. La synchronisation nécessite un compte.</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -352,6 +360,26 @@ const createStyles = (palette: AppColors) => StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: '600',
     paddingVertical: spacing.sm,
+  },
+  offlineButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.medium,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+  },
+  offlineButtonText: {
+    color: palette.sage,
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+  },
+  offlineHint: {
+    color: palette.textSecondary,
+    fontSize: typography.sizes.xs,
+    textAlign: 'center',
   },
 });
 

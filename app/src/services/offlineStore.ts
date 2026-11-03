@@ -47,6 +47,7 @@ const emptyStatus: OfflineSyncStatus = Object.freeze({
 const cacheKey = (userId: string, collectionKey: string) =>
   `qozy-cache:${userId}:${collectionKey}`;
 const outboxKey = (userId: string) => `qozy-outbox:${userId}`;
+const offlineCopyKey = (userId: string) => `qozy-keep-offline-copy:${userId}`;
 
 const serializeValue = (value: unknown): unknown => {
   if (value instanceof Timestamp) return { __qozyTimestamp: value.toMillis() };
@@ -115,7 +116,40 @@ export const saveCachedDocuments = <T extends OfflineDocument>(
   collectionKey: string,
   documents: T[]
 ) =>
-  runStorageTask(() => writeStoredValue(cacheKey(userId, collectionKey), documents));
+  runStorageTask(async () => {
+    const keepOfflineCopy = await AsyncStorage.getItem(offlineCopyKey(userId));
+    if (keepOfflineCopy === 'false') return;
+    await writeStoredValue(cacheKey(userId, collectionKey), documents);
+  });
+
+export const getKeepOfflineCopy = async (userId: string) =>
+  (await AsyncStorage.getItem(offlineCopyKey(userId))) !== 'false';
+
+export const setKeepOfflineCopy = (userId: string, enabled: boolean) =>
+  runStorageTask(async () => {
+    await AsyncStorage.setItem(offlineCopyKey(userId), String(enabled));
+    if (!enabled) {
+      const keys = await AsyncStorage.getAllKeys();
+      const prefix = `qozy-cache:${userId}:`;
+      const cacheKeys = keys.filter((key) => key.startsWith(prefix));
+      if (cacheKeys.length) await AsyncStorage.multiRemove(cacheKeys);
+    }
+  });
+
+export const getLocalOfflineData = (userId: string) =>
+  runStorageTask(async () => {
+    const keys = await AsyncStorage.getAllKeys();
+    const prefix = `qozy-cache:${userId}:`;
+    const cacheKeys = keys.filter((key) => key.startsWith(prefix));
+    const cacheEntries = await Promise.all(cacheKeys.map(async (key) => [
+      key.slice(prefix.length),
+      await readStoredValue<OfflineDocument[]>(key, []),
+    ] as const));
+    return {
+      cachedCollections: Object.fromEntries(cacheEntries),
+      pendingWrites: await readStoredValue<OfflineWrite[]>(outboxKey(userId), []),
+    };
+  });
 
 export const getPendingWrites = (userId: string, collectionKey?: string) =>
   runStorageTask(async () => {

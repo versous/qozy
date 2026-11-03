@@ -186,16 +186,6 @@ export default function CalendarScreen() {
     }
   };
 
-  const openTaskModal = () => {
-    setEditingTask(null);
-    setTaskTitle('');
-    setTaskDescription('');
-    setTaskDueDate(selectedDate);
-    setTaskPriority('normal');
-    setTaskError('');
-    setIsTaskModalVisible(true);
-  };
-
   const openEditTaskModal = (task: TodoTask) => {
     setEditingTask(task);
     setTaskTitle(task.title);
@@ -532,7 +522,10 @@ export default function CalendarScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={openTaskModal}
+          onPress={() => router.push({
+            pathname: '/task-editor',
+            params: { date: selectedDate },
+          })}
           style={({ pressed }) => [styles.planTaskButton, pressed && styles.pressed]}>
           <Text style={styles.planTaskButtonText}>＋  Planifier un petit pas</Text>
         </Pressable>
